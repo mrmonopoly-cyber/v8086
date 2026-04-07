@@ -25,6 +25,7 @@ extern "C"
   X(-pedantic)\
   X(-xc++)\
   X(-std=c++17)\
+  X(-g)\
 
 #define LINKER_ARGS \
   X(-Wall)\
@@ -36,8 +37,6 @@ bool compile_obj(Nob_Walk_Entry entry)
 {
   Cmd cmd = {0};
   size_t len = strlen(entry.path);
-
-  nob_log(INFO, "considering %s", entry.path);
 
   if(
       entry.type == NOB_FILE_REGULAR &&
