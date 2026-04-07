@@ -3,7 +3,6 @@
 #include <iostream>
 #include <string_view>
 
-#include "v8086/utils.hpp"
 #include "v8086/v8086.hpp"
 
 static inline void _help(void)
@@ -12,7 +11,6 @@ static inline void _help(void)
   printf("\t -h \t\t print _help\n");
   printf("\t -o [file] \t output file name\n");
 }
-
 
 int main(int argc, char *argv[])
 {
@@ -61,6 +59,7 @@ int main(int argc, char *argv[])
   v8086.upload_program(in_path);
   while((instr = v8086.decode_next_instruction()).has_value())
   {
+    std::cout << instr->to_string().data << '\n';
     TODO("not yet implemented");
   }
 

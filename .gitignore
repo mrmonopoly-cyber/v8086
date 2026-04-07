@@ -3,3 +3,5 @@ nob
 main
 build
 *o
+.cache/
+compile_commands.json

@@ -26,10 +26,13 @@ extern "C"
   X(-xc++)\
   X(-std=c++17)\
   X(-g)\
+  X(-fsanitize=address)\
+  X(-Isrc/v8086/common)\
 
 #define LINKER_ARGS \
   X(-Wall)\
   X(-Wextra)\
+  X(-fsanitize=address)\
 
 #define O_FILE "main"
 

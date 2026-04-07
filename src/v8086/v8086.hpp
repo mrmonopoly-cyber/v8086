@@ -4,7 +4,7 @@
 #include <filesystem>
 #include <optional>
 
-#include "common.hpp"
+#include "common/common.hpp"
 
 class V8086
 {
@@ -14,4 +14,6 @@ class V8086
 
   private:
     std::array<u8, 1024 * 1024> memory;
+    size_t program_length;
+    size_t decode_index;
 };
