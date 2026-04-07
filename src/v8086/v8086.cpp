@@ -1,10 +1,16 @@
 #include "v8086.hpp"
 
 #include "utils.hpp"
+#include <fstream>
 
-int V8086::load_program(::std::filesystem::path) noexcept
+int V8086::upload_program(::std::filesystem::path path) noexcept
 {
-  TODO("not yet implemented");
+  if(path.empty()) return 0;
+
+  std::ifstream istream{path};
+  char* ptr = reinterpret_cast<char*>(this->memory.data());
+  istream.read(ptr, this->memory.size());
+
   return 0;
 }
 

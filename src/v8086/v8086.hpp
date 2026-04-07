@@ -9,11 +9,7 @@
 class V8086
 {
   public:
-    V8086() : memory({})
-    {
-    }
-
-    int load_program(::std::filesystem::path) noexcept;
+    int upload_program(::std::filesystem::path) noexcept;
     std::optional<Instruction> decode_next_instruction() const noexcept;
 
   private:

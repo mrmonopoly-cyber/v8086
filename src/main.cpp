@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
     return 1;
   }
 
-  v8086.load_program(in_path);
+  v8086.upload_program(in_path);
   while((instr = v8086.decode_next_instruction()).has_value())
   {
     TODO("not yet implemented");
