@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
   v8086.upload_program(in_path);
   while((instr = v8086.decode_next_instruction()).has_value())
   {
-    std::cout << instr->to_string().data << '\n';
+    std::cout << instr->to_string().data.data() << '\n';
     TODO("not yet implemented");
   }
 
