@@ -1,5 +1,6 @@
 #pragma once
 
+#include "types.hpp"
 #include <array>
 #include <iostream>
 
@@ -119,10 +120,11 @@
 
 /** For jumps above and below refer to the relationship of two UNSIGNED VALUES */
 /** For jumps greater and less refer to the relationship of two SIGNED VALUES */
-enum Opcode
+enum Opcode : u8
 {
 #define X(OP, asm_name, descr) OP,
   OpCodes
+  SHARED, //check second byte
   INVALID_OP
 #undef X
 };
@@ -156,6 +158,7 @@ enum Reg
 #define X(Reg, OPS, DESCR) Reg,
   Regs
 #undef X
+  INVALID_REG
 };
 
 struct Addr
