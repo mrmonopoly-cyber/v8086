@@ -56,6 +56,21 @@ int main(int argc, char *argv[])
     return 1;
   }
 
+  //INFO: tests for print
+  // Instruction hj{MOV, AX, BX};
+  // Instruction hj1{MOV, AX, Addr{Addr::_8_bit, 69}};
+  // Instruction hj2{MOV, BX, Addr{Addr::_16_bit, 42}};
+  // Instruction hj3{MOV, Addr{Addr::_8_bit, 69}, CX};
+  // Instruction hj4{MOV, Addr{Addr::_16_bit, 42}, DX};
+  // Instruction hj5{};
+  //
+  // ::std::cout << hj.to_string() << std::endl;
+  // ::std::cout << hj1.to_string() << std::endl;
+  // ::std::cout << hj2.to_string() << std::endl;
+  // ::std::cout << hj3.to_string() << std::endl;
+  // ::std::cout << hj4.to_string() << std::endl;
+  // ::std::cout << hj5.to_string() << std::endl;
+
   v8086.upload_program(in_path);
   while((instr = v8086.decode_next_instruction()).has_value())
   {

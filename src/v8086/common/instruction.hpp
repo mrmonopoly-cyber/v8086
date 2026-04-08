@@ -1,7 +1,7 @@
 #pragma once
 
-#include "types.hpp"
 #include <array>
+#include <iostream>
 
 #define OpCodes \
     X(MOV, "mov", "Mov")\
@@ -123,6 +123,7 @@ enum Opcode
 {
 #define X(OP, asm_name, descr) OP,
   OpCodes
+  INVALID_OP
 #undef X
 };
 
@@ -152,62 +153,82 @@ enum Opcode
 
 enum Reg
 {
-#define X(OP, OPS, DESCR) OP,
+#define X(Reg, OPS, DESCR) Reg,
   Regs
 #undef X
 };
 
-typedef u16 Addr16;
-typedef u16 Addr8;
-
-enum OpInputType : char
+struct Addr
 {
-  In_Reg_Reg,
-  In_Reg_Mem8,
-  In_Mem8_Reg,
-  In_Reg_Mem16,
-  In_Mem16_Reg,
-};
+  enum Length{
+    _8_bit,
+    _16_bit,
 
-struct Reg_Reg{
-  Reg fst;
-  Reg snd;
-};
-
-struct Reg_Mem8{
-  Reg fst;
-  Addr8 addr8;
-};
-
-struct Reg_Mem16{
-  Reg fst;
-  Addr16 addr16;
-};
-
-struct Mem8_Reg{
-  Addr8 addr8;
-  Reg fst;
-};
-
-struct Mem16_Reg{
-  Addr16 addr16;
-  Reg fst;
-};
-
-struct Instruction{
-  Opcode op; 
-  OpInputType in_type;
-  union{
-    Reg_Reg reg_reg;
-    Reg_Mem8 reg_mem8;
-    Mem8_Reg mem8_reg;
-    Reg_Mem16 reg_mem16;
-    Mem16_Reg mem16_reg;
+    ___Length_len
   };
 
-  struct InstructionStr{
-    std::array<char, 64> data;
-  };
+  Addr(Length len, ::std::size_t raw) noexcept : len(len), raw(raw) {}
 
-  InstructionStr to_string(void) const noexcept;
+  Length len;
+  ::std::size_t raw;
+};
+
+class Instruction{
+  public:
+    enum OpInputType : char
+    {
+      In_Reg_Reg,
+      In_Reg_Mem,
+      In_Mem_Reg,
+
+      In_no_arg,
+    };
+
+    struct InstructionStr{
+      ::std::array<char, 64> data;
+
+      inline friend ::std::ostream& operator<<(::std::ostream& out, const InstructionStr& i)
+      {
+        out << &i.data[0];
+        return out;
+      }
+
+      inline const char* cstr() const noexcept{
+        return data.data();
+      };
+    };
+
+    Instruction() noexcept : op(INVALID_OP), in_type(In_no_arg), data() {};
+
+    Instruction(Opcode op, Reg r1, Reg r2) noexcept :
+      op(op), in_type(In_Reg_Reg), data(r1, r2) {}
+
+    Instruction(Opcode op, Reg r1, Addr addr) noexcept :
+      op(op), in_type(In_Reg_Mem), data(r1, addr) {}
+
+    Instruction(Opcode op, Addr addr, Reg r) noexcept :
+      op(op), in_type(In_Mem_Reg), data(r, addr) {}
+
+    InstructionStr to_string(void) const noexcept;
+
+  private:
+    Opcode op; 
+    OpInputType in_type;
+    union RegMemData{
+      struct Reg_Reg{
+        Reg fst;
+        Reg snd;
+      }reg_reg;
+      struct Reg_Mem{
+        Reg r;
+        Addr a;
+      }reg_mem;
+
+      struct No_Arg{
+      }no_arg;
+
+      inline RegMemData(Reg r1, Reg r2) noexcept : reg_reg(Reg_Reg{r1, r2}) {}
+      inline RegMemData(Reg r, Addr addr) noexcept : reg_mem(Reg_Mem{r, addr}) {}
+      inline RegMemData() noexcept : no_arg() {}
+    }data;
 };
