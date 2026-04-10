@@ -10,8 +10,11 @@ static inline int write_reg(char* data, ::std::size_t len, Reg r)
   switch (r)
   {
 #define X(reg, regs, descr) case reg: sw = regs; break;
-    Regs
+  Regs
 #undef X
+    case INVALID_REG:
+      assert(0 && "unreachable");
+      break;
   }
 
   return sw.copy(data, len);
@@ -55,6 +58,9 @@ Instruction::InstructionStr Instruction::to_string(void) const noexcept
       case INVALID_OP:
         ops = "invalid_op";
         break;
+  case SHARED:
+    assert(0 && "unreachable");
+    break;
   }
 
   cursor += ops.copy(res.data.data(), res.data.size()); //opcode
