@@ -74,17 +74,17 @@ ORG(popf, {Bits(1001111)})                                        /**pop flags*/
 
 //add
 ORG(add, {Bits(000000), D, W, MOD, REG, RM})                      /**reg/mem with reg to either*/
-ORG(add, {Bits(100000), S, W, MOD, Bits(000), RM})                /**imm to reg/mem*/
-ORG(add, {Bits(0000010), W, DATA, DATA_IF_W})                     /**imm to acc*/
+VAR(add, {Bits(100000), S, W, MOD, Bits(000), RM})                /**imm to reg/mem*/
+VAR(add, {Bits(0000010), W, DATA, DATA_IF_W})                     /**imm to acc*/
 
 //adc
 ORG(adc, {Bits(000100), D, W, MOD, REG, RM})                      /**reg/mem with reg to either*/
-ORG(adc, {Bits(100000), S, W, MOD, Bits(010), RM})                /**imm to reg/mem*/
-ORG(adc, {Bits(0001010), W, DATA, DATA_IF_W})                     /**imm to acc*/
+VAR(adc, {Bits(100000), S, W, MOD, Bits(010), RM})                /**imm to reg/mem*/
+VAR(adc, {Bits(0001010), W, DATA, DATA_IF_W})                     /**imm to acc*/
 
 //inc
 ORG(inc, {Bits(1111111), W, MOD, Bits(000), RM})                  /**reg/mem*/
-ORG(inc, {Bits(01000), REG})                                      /**reg*/
+VAR(inc, {Bits(01000), REG})                                      /**reg*/
 
 //aaa
 ORG(aaa, {Bits(00110111)})                                        /**ASCII adjust for add*/
@@ -94,25 +94,25 @@ ORG(daa, {Bits(00100111)})                                        /**decimal adj
 
 //sub
 ORG(sub, {Bits(001010), D, W, MOD, REG, RM})                      /**reg/mem with reg to either*/
-ORG(sub, {Bits(100000), S, W, MOD, Bits(101), RM})                /**imm to reg/mem*/
-ORG(sub, {Bits(0010110), W, DATA, DATA_IF_W})                     /**imm to acc*/
+VAR(sub, {Bits(100000), S, W, MOD, Bits(101), RM})                /**imm to reg/mem*/
+VAR(sub, {Bits(0010110), W, DATA, DATA_IF_W})                     /**imm to acc*/
 
 //sbb
 ORG(sbb, {Bits(000110), D, W, MOD, REG, RM})                      /**reg/mem with reg to either*/
-ORG(sbb, {Bits(100000), S, W, MOD, Bits(101), RM})                /**imm to reg/mem*/
-ORG(sbb, {Bits(0001110), W, DATA, DATA_IF_W})                     /**imm to acc*/
+VAR(sbb, {Bits(100000), S, W, MOD, Bits(101), RM})                /**imm to reg/mem*/
+VAR(sbb, {Bits(0001110), W, DATA, DATA_IF_W})                     /**imm to acc*/
 
 //dec
 ORG(dec, {Bits(1111111), W, MOD, Bits(001), RM})                  /**reg/mem*/
-ORG(dec, {Bits(01001), REG})                                      /**reg*/
+VAR(dec, {Bits(01001), REG})                                      /**reg*/
 
 //neg
 ORG(neg, {Bits(1111011), W, MOD, Bits(011), RM})                  /**change sign*/
 
 //cmp
 ORG(cmp, {Bits(001110), D, W, MOD, REG, RM})                      /**reg/mem and reg*/
-ORG(cmp, {Bits(100000), S, W, MOD, Bits(111), RM})                /**imm with reg/mem*/
-ORG(cmp, {Bits(0011110), DATA})                                   /**imm with acc*/
+VAR(cmp, {Bits(100000), S, W, MOD, Bits(111), RM})                /**imm with reg/mem*/
+VAR(cmp, {Bits(0011110), DATA})                                   /**imm with acc*/
 
 //aas
 ORG(aas, {Bits(00111111)})                                        /**ASCII adjust for subtract*/
@@ -138,7 +138,6 @@ ORG(aad, {Bits(11010101), Bits(00001010)})                        /**ASCII adjus
 ORG(cbw, {Bits(10011000)})                                        /**convert byte to word*/
 ORG(cdw, {Bits(10011001)})                                        /**convert word to double word*/
 
-
 #undef ORG
 #undef VAR
 
@@ -150,4 +149,10 @@ ORG(cdw, {Bits(10011001)})                                        /**convert wor
 #undef Z
 
 #undef MOD
+#undef SR
 #undef REG
+#undef RM
+
+#undef DATA
+#undef DATA_IF_W
+#undef ADDR

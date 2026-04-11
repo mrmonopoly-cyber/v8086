@@ -52,15 +52,13 @@ Instruction::InstructionStr Instruction::to_string(void) const noexcept
 
   switch (this->op)
   {
-#define X(OP, asm_name, descr) case OP:ops = asm_name;break;
-  OpCodes
-#undef X
-      case INVALID_OP:
-        ops = "invalid_op";
-        break;
-  case SHARED:
-    assert(0 && "unreachable");
-    break;
+#define ORG(Mnemonic, ...) case Op_##Mnemonic: ops = #Mnemonic;break;
+#define VAR(Mnemonic, ...) 
+#include "../v8086_instruction_table.inl"
+
+    case INVALID_OP: 
+      assert(0 && "unreachable INVALID_OP");
+      break;
   }
 
   cursor += ops.copy(res.data.data(), res.data.size()); //opcode
