@@ -1,8 +1,10 @@
 #pragma once
 
-#include "types.hpp"
-#include <array>
 #include <iostream>
+#include <array>
+
+#include "types.hpp"
+#include "registers.hpp"
 
 /** For jumps above and below refer to the relationship of two UNSIGNED VALUES */
 /** For jumps greater and less refer to the relationship of two SIGNED VALUES */
@@ -12,38 +14,6 @@ enum Opcode : u8
 #define VAR(Mnemonic, ...)
 #include "../v8086_instruction_table.inl"
   INVALID_OP
-};
-
-#define Regs \
-  X(AX, "ax", "accumulator")\
-  X(AH, "ah", "ah")\
-  X(AL, "al", "al")\
-  X(BX, "bx", "base")\
-  X(BH, "bh", "bh")\
-  X(BL, "bl", "bl")\
-  X(CX, "cx", "count")\
-  X(CH, "ch", "ch")\
-  X(CL, "cl", "cl")\
-  X(DX, "dx", "data")\
-  X(DH, "dh", "dh")\
-  X(DL, "dl", "dl")\
-  X(SP, "sp", "stack pointer")\
-  X(BP, "bp", "Base Pointer")\
-  X(SI, "si", "Source Index")\
-  X(DI, "di", "Destination Index")\
-  X(CS, "cs", "Code Segment")\
-  X(DS, "ds", "Data Segment")\
-  X(SS, "ss", "Stack Segment")\
-  X(ES, "es", "Extra Segment")\
-  X(IP, "ip", "Instruction Pointer")\
-
-
-enum Reg
-{
-#define X(Reg, OPS, DESCR) Reg,
-  Regs
-#undef X
-  INVALID_REG
 };
 
 struct Addr

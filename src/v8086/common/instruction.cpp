@@ -9,11 +9,22 @@ static inline int write_reg(char* data, ::std::size_t len, Reg r)
   std::string_view sw{};
   switch (r)
   {
-#define X(reg, regs, descr) case reg: sw = regs; break;
-  Regs
-#undef X
-    case INVALID_REG:
-      assert(0 && "unreachable");
+    case ax: sw = "ax"; break;
+    case ah: sw = "ah"; break;
+    case al: sw = "al"; break;
+    case bx: sw = "bx"; break;
+    case bh: sw = "bh"; break;
+    case bl: sw = "bl"; break;
+    case cx: sw = "cx"; break;
+    case ch: sw = "ch"; break;
+    case cl: sw = "cl"; break;
+    case dx: sw = "dx"; break;
+    case dh: sw = "dh"; break;
+    case dl: sw = "dl"; break;
+    case sp: sw = "sp"; break;
+    case bp: sw = "bp"; break;
+    case si: sw = "si"; break;
+    case di: sw = "di"; break;
       break;
   }
 

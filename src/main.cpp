@@ -57,11 +57,11 @@ int main(int argc, char *argv[])
   }
 
   // INFO: tests for print
-  // Instruction hj{Op_mov, AX, BX};
-  // Instruction hj1{Op_mov, AX, Addr{Addr::_8_bit, 69}};
-  // Instruction hj2{Op_mov, BX, Addr{Addr::_16_bit, 42}};
-  // Instruction hj3{Op_mov, Addr{Addr::_8_bit, 69}, CX};
-  // Instruction hj4{Op_mov, Addr{Addr::_16_bit, 42}, DX};
+  // Instruction hj{Op_mov, ax, bx};
+  // Instruction hj1{Op_mov, ax, Addr{Addr::_8_bit, 69}};
+  // Instruction hj2{Op_mov, bx, Addr{Addr::_16_bit, 42}};
+  // Instruction hj3{Op_mov, Addr{Addr::_8_bit, 69}, cx};
+  // Instruction hj4{Op_mov, Addr{Addr::_16_bit, 42}, dx};
   // Instruction hj5{};
   //
   // ::std::cout << hj.to_string() << std::endl;
