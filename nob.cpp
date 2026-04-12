@@ -12,7 +12,7 @@ extern "C"
 #endif // !BUILD_DIR
 
 #ifndef SRC_DIR
-#define SRC_DIR "src"
+#define SRC_DIR "v8086"
 #endif // !SRC_DIR
 
 #ifndef CPP_COMPILER
@@ -27,7 +27,6 @@ extern "C"
   X(-std=c++17)\
   X(-g)\
   X(-fsanitize=address)\
-  X(-Isrc/v8086/common)\
 
 #define LINKER_ARGS \
   X(-Wall)\
