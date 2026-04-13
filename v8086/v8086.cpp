@@ -71,6 +71,8 @@ ProgramID ProgramLoad(v8086& self, const char* file_program_path, const ProgramO
 
     if(program_f)
     {
+      //FIX: you may write more data than what is available in the segment.
+      //Correct from the point of view of 8086 but still dangerous. Keep it?
       prog->segment[CS].written =fread(phy_addr,1, prog_info.cs_size, program_f);
       fclose(program_f);
     }
