@@ -1,28 +1,43 @@
 #pragma once
 
-#include "v8086_definitions.h"
+#include <string.h>
 
-#include "memory.h"
-#include "decoder.h"
+#include <v8086_definitions.h>
+
+#include "memory/memory.h"
+#include "decoder/decoder.h"
 
 #define MAX_NUM_OF_PROGRAMS 32
 
 typedef s32 ProgramID;
 
-struct ProgramInfo{
-  u16 cs_size = 16 * (1 << PowKilo);
-  u16 ss_size = 16 * (1 << PowKilo);
-  u16 ds_size = 16 * (1 << PowKilo);
-  u16 es_size = 16 * (1 << PowKilo);
-  const char* file_program_path = nullptr;
+struct ProgramOptInfo{
+  u32 cs_size = 64 * (1 << PowKilo);
+  u32 ss_size = 64 * (1 << PowKilo);
+  u32 ds_size = 64 * (1 << PowKilo);
+  u32 es_size = 64 * (1 << PowKilo);
+};
+
+enum ProgSegments
+{
+  CS=0,
+  SS,
+  DS,
+  ES,
+
+  __ProgSegments_Count
+};
+
+
+struct ProgramSegment{
+  LogicalSegment log_seg;
+  u16 written;
 };
 
 struct Program
 {
-  LogicalSegment cs;
-  LogicalSegment ss;
-  LogicalSegment ds;
-  LogicalSegment es;
+  ProgramSegment segment[__ProgSegments_Count];
+  u32 decoding_index;
 };
 
 struct v8086
@@ -35,14 +50,16 @@ struct v8086
 static inline int v8086PowerOn(v8086& self)
 {
   self.memory = PhyMemoryAllocate();
-  return -PhyMemoryIsValid(self.memory);
+  return PhyMemoryIsValid(self.memory);
 }
 
-ProgramID loadProgram(v8086& self, const ProgramInfo& prog_info);
-u32 programLength(const v8086& self, const ProgramID prog);
-Instruction programDecodeInstrAt(const v8086& self,const ProgramID prog, const u32 offset);
+ProgramID ProgramLoad(v8086& self, const char* file_program_path, const ProgramOptInfo& prog_info={});
+  
+int ProgramDumpNextInstr(const v8086& self,const ProgramID prog_id, Instruction* out);
 
 static inline void v8086Shutdown(v8086& self)
 {
   PhyMemoryFree(self.memory);
+  memset(self.running, 0, sizeof(self.running));
+  self.next_free =0;
 }

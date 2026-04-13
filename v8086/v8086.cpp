@@ -1,28 +1,56 @@
 #include "v8086.h"
 
+#include <assert.h>
+#include <string.h>
+#include <errno.h>
 #include <stdio.h>
 
-#include "memory.h"
-
-static inline ProgramID next_prog_id(v8086& self)
+static ProgramID next_prog_id(v8086& self)
 {
-  if(self.next_free < self.memory.capacity)
+  ProgramID res=-1;
+
+  if(self.next_free < PhyMemoryCapacity(self.memory))
   {
-    return self.next_free++;
+    res = self.next_free++;
   }
 
-  return -1;
+  //HACK: only one program can be loaded
+  if(res > 0)
+  {
+    res = -1;
+    self.next_free--;
+  }
+
+  return res;
 }
 
-ProgramID loadProgram(v8086& self, const ProgramInfo& prog_info)
+
+static ProgramSegment _seg_init(PhyMemory& mem, u32 *physical_addr, const u32 size)
+{
+  ProgramSegment res;
+
+  u32 paddr = *physical_addr;
+  (*physical_addr) += size;
+
+  res.log_seg = MakeSegment(mem, paddr);
+  res.written = 0;
+
+  return res;
+}
+
+ProgramID ProgramLoad(v8086& self, const char* file_program_path, const ProgramOptInfo& prog_info)
 {
   ProgramID res = -1;
+  FILE* program_f = nullptr;
   Program* prog = nullptr;
-  FILE* program_f = fopen(prog_info.file_program_path, "rb");
   u8* phy_addr = nullptr;
+  u32 physical_addr =0; //INFO: at the moment only one program is loadable
 
-  if(program_f == nullptr){
-    return res;
+  assert(PhyMemoryIsValid(self.memory));
+
+  if(file_program_path == nullptr)
+  {
+    return -5;
   }
 
   res = next_prog_id(self);
@@ -30,37 +58,51 @@ ProgramID loadProgram(v8086& self, const ProgramInfo& prog_info)
   if(res >= 0)
   {
     prog = &self.running[res];
-    prog->cs = PhyMemorySaveSegment(self.memory, prog_info.cs_size);
-    prog->ss = PhyMemorySaveSegment(self.memory, prog_info.ss_size);
-    prog->ds = PhyMemorySaveSegment(self.memory, prog_info.ds_size);
-    prog->es = PhyMemorySaveSegment(self.memory, prog_info.es_size);
 
-    if(
-        !prog->cs.segment_base || !prog->ss.segment_base ||
-        !prog->ds.segment_base || !prog->es.segment_base
-      )
+    prog->segment[CS] = _seg_init(self.memory, &physical_addr, prog_info.cs_size);
+    prog->segment[SS] = _seg_init(self.memory, &physical_addr, prog_info.ss_size);
+    prog->segment[DS] = _seg_init(self.memory, &physical_addr, prog_info.ds_size);
+    prog->segment[ES] = _seg_init(self.memory, &physical_addr, prog_info.es_size);
+
+    physical_addr = AddrFromSegment(prog->segment[CS].log_seg);
+    phy_addr = PhyGetAddrAt(self.memory, physical_addr);
+
+    program_f = fopen(file_program_path, "rb");
+
+    if(program_f)
     {
-      self.next_free--;
-      res = -1;
-      return res;
+      prog->segment[CS].written =fread(phy_addr,1, prog_info.cs_size, program_f);
+      fclose(program_f);
     }
+    else
+    {
 
-    phy_addr = PhyMemoryGetAddressOf(self.memory, prog->cs);
-    prog->cs.written = fread(phy_addr,1, prog_info.cs_size, program_f);
+      fprintf(stderr, "error opening input file: %s with error %s\n",
+          file_program_path, strerror(errno));
+        self.next_free--;
+        res = -errno;
+        return res;
+    }
   }
 
   return res;
 }
 
-u32 programLength(const v8086& self, const ProgramID prog)
+int ProgramDumpNextInstr(const v8086& self,const ProgramID prog_id, Instruction* out)
 {
-  const Program* p_prog = &self.running[prog];
+  assert(out);
+  assert(prog_id >=0 && prog_id < MAX_NUM_OF_PROGRAMS );
 
-  return p_prog->cs.written;
-}
+  int res=-1;
+  const Program* prog = &self.running[prog_id];
+  u32 index = prog->decoding_index;
 
-Instruction programDecodeInstrAt(const v8086& self,const ProgramID prog, const u32 offset)
-{
 
-  return {};
+  if(index < prog->segment[CS].written)
+  {
+    TODO();
+    res=0;
+  }
+
+  return res;
 }

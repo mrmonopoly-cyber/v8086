@@ -27,6 +27,7 @@ extern "C"
   X(-std=c++17)\
   X(-g)\
   X(-fsanitize=address)\
+  X(-I../v8086/v8086_definitions)\
 
 #define LINKER_ARGS \
   X(-Wall)\

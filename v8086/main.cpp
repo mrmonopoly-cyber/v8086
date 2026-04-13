@@ -54,7 +54,7 @@ static inline Inputs _parse_args(int argc, char **argv)
 
   if(res.file_program_path == nullptr)
   {
-    printf("missing input program\n");
+    printf("missing input programOpt\n");
     _help();
     exit(1);
   }
@@ -64,25 +64,36 @@ static inline Inputs _parse_args(int argc, char **argv)
 
 int main(int argc, char *argv[])
 {
-  Inputs input;
-
+  int res=0;
   v8086 v8086;
-  ProgramInfo info;
   ProgramID pid;
   Instruction instr;
 
-  input = _parse_args(argc, argv);
+  Inputs input = _parse_args(argc, argv);
 
-  v8086PowerOn(v8086);
-
-  pid = loadProgram(v8086, info);
-  for(u32 i=0; i<programLength(v8086, pid); i++)
+  if(!v8086PowerOn(v8086))
   {
-    instr = programDecodeInstrAt(v8086, pid, i);
-    print(instr, input.out);
+    fprintf(stderr, "error init v8086\n");
+    res = 1;
+    goto end;
   }
 
-  v8086Shutdown(v8086);
+  pid = ProgramLoad(v8086, input.file_program_path);
 
-  return 0;
+  if(pid<0)
+  {
+    fprintf(stderr, "error loading programOpt: %s with error %d\n", input.file_program_path, pid);
+    res = 1;
+    goto end;
+  }
+
+  while(ProgramDumpNextInstr(v8086, pid, &instr) >= 0)
+  {
+    InstructionPrint(instr, input.out);
+  }
+
+
+end:
+  v8086Shutdown(v8086);
+  return res;
 }
