@@ -55,7 +55,7 @@ static inline int v8086PowerOn(v8086& self)
 
 ProgramID ProgramLoad(v8086& self, const char* file_program_path, const ProgramOptInfo& prog_info={});
   
-int ProgramDumpNextInstr(const v8086& self,const ProgramID prog_id, Instruction* out);
+int ProgramDumpNextInstr(v8086& self,const ProgramID prog_id, Instruction* out);
 
 static inline void v8086Shutdown(v8086& self)
 {

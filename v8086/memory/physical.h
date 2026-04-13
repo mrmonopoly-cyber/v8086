@@ -19,7 +19,7 @@ static inline u32 PhyMemoryCapacity(PhyMemory& mem)
   return mem.mask + 1;
 }
 
-static inline u8* PhyGetAddrAt(PhyMemory& mem, u32 addr)
+static inline u8* PhyGetAddrAt(const PhyMemory& mem, const u32 addr)
 {
   u8* res = nullptr;
 

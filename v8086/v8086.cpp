@@ -1,4 +1,8 @@
 #include "v8086.h"
+#include "decoder/decoder.h"
+#include "memory/memory.h"
+#include "memory/physical.h"
+#include "v8086_definitions.h"
 
 #include <assert.h>
 #include <string.h>
@@ -90,20 +94,45 @@ ProgramID ProgramLoad(v8086& self, const char* file_program_path, const ProgramO
   return res;
 }
 
-int ProgramDumpNextInstr(const v8086& self,const ProgramID prog_id, Instruction* out)
+int ProgramDumpNextInstr(v8086& self,const ProgramID prog_id, Instruction* out)
 {
   assert(out);
   assert(prog_id >=0 && prog_id < MAX_NUM_OF_PROGRAMS );
 
   int res=-1;
-  const Program* prog = &self.running[prog_id];
+  Program* prog = &self.running[prog_id];
+  const u32 prog_length = prog->segment[CS].written;
   u32 index = prog->decoding_index;
-
+  u32 physical_addr = 0;
+  s32 written =0;
+  EncodedInstruction encoded_instr = {};
 
   if(index < prog->segment[CS].written)
   {
-    TODO();
-    res=0;
+    for(u16 i=0; i<ArraySize(encoded_instr.data); i++)
+    {
+      index = prog->decoding_index + i;
+      if(index >= prog_length) break;
+
+      physical_addr = AddrFromSegment(prog->segment[CS].log_seg, index);
+      encoded_instr.data[i] = *PhyGetAddrAt(self.memory, physical_addr);
+      encoded_instr.len++;
+    }
+
+    written = InstructionDecode(encoded_instr, out);
+
+    if(written)
+    {
+      res=0;
+      prog->decoding_index += written;
+    }
+    else
+    {
+      res = -2;
+      fprintf(stderr, "Instruction not recognized: ");
+      EncodedInstructionPrintMnemonic(encoded_instr, stderr);
+      fprintf(stderr, "\n");
+    }
   }
 
   return res;
