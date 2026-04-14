@@ -23,6 +23,8 @@ static inline Inputs _parse_args(int argc, char **argv)
   Inputs res;
   ::std::string_view sw;
 
+  res.out = stdout;
+
   for(int i=1; i<argc; i++)
   {
     sw = argv[i];
@@ -87,6 +89,7 @@ int main(int argc, char *argv[])
     goto end;
   }
 
+  fprintf(input.out, "bits %d\n\n", v8086RegSize(v8086));
   while(ProgramDumpNextInstr(v8086, pid, &instr) >= 0)
   {
     InstructionPrint(instr, input.out);

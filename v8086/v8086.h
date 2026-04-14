@@ -53,6 +53,12 @@ static inline int v8086PowerOn(v8086& self)
   return PhyMemoryIsValid(self.memory);
 }
 
+static inline int v8086RegSize(v8086& self)
+{
+  UNUSED(self);
+  return 16;
+}
+
 ProgramID ProgramLoad(v8086& self, const char* file_program_path, const ProgramOptInfo& prog_info={});
   
 int ProgramDumpNextInstr(v8086& self,const ProgramID prog_id, Instruction* out);

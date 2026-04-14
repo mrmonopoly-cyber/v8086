@@ -26,3 +26,5 @@ enum PowMem : u32{
 
 #define TODO(...)\
   do{printf("%s.%d: TODO: %s\n", __FILE__, __LINE__, __VA_ARGS__""); exit(99);}while(0);
+
+#define UNUSED(X) (void)X
