@@ -41,7 +41,7 @@ static inline Inputs _parse_args(int argc, char **argv)
         _help();
         exit(1);
       }
-      res.out = fopen(argv[i], "rb");
+      res.out = fopen(argv[i], "wa");
       if(res.out == nullptr)
       {
         fprintf(stderr, "invalid out print: %s\n", strerror(errno));
