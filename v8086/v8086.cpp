@@ -42,6 +42,22 @@ static ProgramSegment _seg_init(PhyMemory& mem, u32 *physical_addr, const u32 si
   return res;
 }
 
+static void _print_byte(u8 byte, FILE* out)
+{
+  fprintf(stderr, "0b");
+  for(u8 i=0; i<8; i++)
+  {
+    if((byte>> (7 - i)) & 0x1)
+    {
+      fprintf(out, "1");
+    }else
+    {
+      fprintf(out, "0");
+    }
+  }
+  fprintf(stderr, " (%d)", byte);
+}
+
 ProgramID ProgramLoad(v8086& self, const char* file_program_path, const ProgramOptInfo& prog_info)
 {
   ProgramID res = -1;
@@ -105,21 +121,13 @@ int ProgramDumpNextInstr(v8086& self,const ProgramID prog_id, Instruction* out)
   u32 index = prog->decoding_index;
   u32 physical_addr = 0;
   s32 written =0;
-  EncodedInstruction encoded_instr = {};
+  u8* mem_ptr = nullptr;
 
   if(index < prog->segment[CS].written)
   {
-    for(u16 i=0; i<ArraySize(encoded_instr.data); i++)
-    {
-      index = prog->decoding_index + i;
-      if(index >= prog_length) break;
-
-      physical_addr = AddrFromSegment(prog->segment[CS].log_seg, index);
-      encoded_instr.data[i] = *PhyGetAddrAt(self.memory, physical_addr);
-      encoded_instr.len++;
-    }
-
-    written = InstructionDecode(encoded_instr, out);
+    physical_addr = AddrFromSegment(prog->segment[CS].log_seg, index);
+    mem_ptr = PhyGetAddrAt(self.memory, physical_addr);
+    written = InstructionDecode(mem_ptr, prog_length - index ,out);
 
     if(written)
     {
@@ -129,8 +137,8 @@ int ProgramDumpNextInstr(v8086& self,const ProgramID prog_id, Instruction* out)
     else
     {
       res = -2;
-      fprintf(stderr, "Instruction not recognized: ");
-      EncodedInstructionPrintMnemonic(encoded_instr, stderr);
+      fprintf(stderr, "Mnemonic not recognized: ");
+      _print_byte(*mem_ptr, stderr);
       fprintf(stderr, "\n");
     }
   }
