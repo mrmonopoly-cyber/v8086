@@ -33,8 +33,9 @@ enum Opcode
   X(bh)\
   X(di)
 
-enum Register
+enum Register : u16
 {
+  INVALID_REG,
 #define X(r) r,
   REGS
 #undef X
@@ -66,7 +67,7 @@ struct Arg{
   union{
     Register reg;
     u32 addr;
-    u16 imm8;
+    u8 imm8;
     u16 imm16;
     RegDisp reg_disp;
     RegRegDisp reg_reg_disp;

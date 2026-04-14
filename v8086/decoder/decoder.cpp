@@ -61,7 +61,7 @@ static inline ModField _get_mod_field(const u8 byte)
 
 static inline Register _get_reg_field(const u8 byte, const u8 w)
 {
-  return regs_dec[(byte >> 3) & 0x3][w];
+  return regs_dec[(byte >> 3) & 0x7][w];
 }
 
 static inline u8 _get_rm_field(const u8 byte)
@@ -72,7 +72,6 @@ static inline u8 _get_rm_field(const u8 byte)
 static inline u8 _mod_rm_to_arg(ModField mod, u8 rm, u8 w, Arg* out)
 {
   u8 res = mod;
-  out->reg_reg_disp.disp =0;
 
   switch (rm)
   {
@@ -99,13 +98,20 @@ static inline u8 _mod_rm_to_arg(ModField mod, u8 rm, u8 w, Arg* out)
       out->reg_disp.r1 = di;
       break;
     case 0b110:
-      if(mod == 0b00)
+      switch (mod)
       {
-        res = 2;
-      }
-      else if(mod == 0b11)
-      {
-        out->reg = regs_dec[rm][w];
+        case MemModeX:
+          res = 2;
+          break;
+        case MemMode8:
+          out->reg_disp.r1 = bp;
+          break;
+        case MemMode16:
+          out->reg_disp.r1 = bp;
+          break;
+        case RegMode:
+          out->reg = regs_dec[rm][w];
+          break;
       }
       break;
     case 0b111:
@@ -133,9 +139,25 @@ static inline u8 _mod_rm_to_arg(ModField mod, u8 rm, u8 w, Arg* out)
       }
       break;
     case MemMode8:
+      if(rm < 0b100)
+      {
+        out->t = ArgMemRegRegDisp;
+      }
+      else
+      {
         out->t = ArgMemRegDisp;
+      }
       break;
     case MemMode16:
+      if(rm < 0b100)
+      {
+        out->t = ArgMemRegRegDisp;
+      }
+      else
+      {
+        out->t = ArgMemRegDisp;
+      }
+      break;
     case RegMode:
         out->t = ArgReg;
         res=0;
@@ -145,55 +167,110 @@ static inline u8 _mod_rm_to_arg(ModField mod, u8 rm, u8 w, Arg* out)
   return res;
 }
 
+static inline u8 _imm_to_arg(const u8* mem, const u8 size, u8 w, Arg* out)
+{
+  u8 res=0;
+
+  if(w && size >= 2)
+  {
+    out->imm16 = (mem[1] << 8) +  mem[0];
+    out->t = ArgImm16;
+    res=2;
+  }
+  else if(!w && size >= 1)
+  {
+    out->imm8 = mem[0];
+    out->t = ArgImm8;
+    res=1;
+  }
+
+  return res;
+}
+
+static u32 _decode_mov_imm_to_reg(
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)
+{
+  u32 res=1;
+  const u8 w = (first_byte >> 3) & 0x1;
+  const Register reg = (Register) (first_byte & 0x7);
+  u8 written;
+  Arg *arg1 = &out->args[0];
+  Arg *arg2 = &out->args[1];
+
+  out->op = Opcode::mov;
+  arg1->t = ArgReg;
+  arg1->reg = regs_dec[reg][w];
+
+  written = _imm_to_arg(mem, size, w, arg2);
+  if(written == 0) goto bad;
+
+  res+=written;
+
+  return res;
+
+bad:
+  res =0;
+  out->op = Opcode::INVALID;
+  return res;
+}
+
 static u32 _decode_mov_reg_mem_to_from_reg(
     const u8 first_byte, const u8* mem, const u32 size, Instruction* out)
 {
   u32 res=1;
-  const u8 snd_byte = mem[0];
+  u8 snd_byte=0;
   const u8 w = _get_w_bit(first_byte);
   const u8 d = _get_d_bit(first_byte);
-  const ModField mod = _get_mod_field(snd_byte);
-  const Register reg = _get_reg_field(snd_byte, w);
-  const u8 rm = _get_rm_field(snd_byte);
+  ModField mod;
+  Register reg;
+  u8 rm;
   Arg arg1;
   Arg arg2;
-  u16 displacement=0;
+  u8 written=0;
 
-  if(size >= 3)
+  if(size <= 0) goto bad;
+
+  snd_byte = mem[0];
+  res++;
+
+  mod = _get_mod_field(snd_byte);
+  reg = _get_reg_field(snd_byte, w);
+  rm = _get_rm_field(snd_byte);
+
+  out->op = Opcode::mov;
+  arg1.t = ArgReg;
+  arg1.reg = reg;
+
+  written = _mod_rm_to_arg(mod, rm, w, &arg2);
+  res+=written;
+  switch(written)
   {
-    out->op = Opcode::mov;
-    arg1.t = ArgReg;
-    arg1.reg = reg;
-
-    res=2;
-    switch(_mod_rm_to_arg(mod, rm, w, &arg2))
-    {
-      case 1:
-        displacement  = mem[1];
-        arg2.reg_disp.disp = displacement;
-        res=3;
-        break;
-      case 2:
-        displacement  = (mem[2] << 8) + mem[1];
-        arg2.reg_reg_disp.disp = displacement;
-        res=4;
-        break;
-    }
-
-    if(d == 0)
-    {
-      out->args[0] = arg2;
-      out->args[1] = arg1;
-    }
-    else
-    {
-      out->args[0] = arg1;
-      out->args[1] = arg2;
-    }
-
+    case 1:
+      if(size <= 1) goto bad;
+      arg2.reg_reg_disp.disp = mem[1];
+      break;
+    case 2:
+      if(size <= 2) goto bad;
+      arg2.reg_reg_disp.disp = (mem[2] << 8) + mem[1];
+      break;
   }
 
+  if(d == 0)
+  {
+    out->args[0] = arg2;
+    out->args[1] = arg1;
+  }
+  else
+  {
+    out->args[0] = arg1;
+    out->args[1] = arg2;
+  }
 
+  return res;
+
+bad:
+  res=0;
+  out->op = Opcode::INVALID;
   return res;
 }
 
@@ -210,6 +287,11 @@ static void _init_decoders_table(void)
     decoders[0b10001000 + i] = _decode_mov_reg_mem_to_from_reg;
   }
 
+  for(u8 i=0; i<= 0b1111; i++)
+  {
+    decoders[0b10110000 + i] = _decode_mov_imm_to_reg;
+  }
+
 }
 
 static void _print_reg(const Register reg, FILE* out)
@@ -219,6 +301,9 @@ static void _print_reg(const Register reg, FILE* out)
 #define X(r) case r: fprintf(out, #r); break;
   REGS
 #undef X
+    case INVALID_REG:
+      assert(0 && "unreachable _print_reg: " __FILE__);
+      break;
   }
 }
 
@@ -233,20 +318,38 @@ static void _print_arg(const Arg* const arg, FILE* out)
       TODO();
       break;
     case ArgImm8:
-      TODO();
+      fprintf(out, "%d", arg->imm8);
       break;
     case ArgImm16:
-      TODO();
+      fprintf(out, "%d", arg->imm16);
       break;
     case ArgMemRegDisp:
-      TODO();
+      fprintf(out, "[");
+      _print_reg(arg->reg_disp.r1, out);
+      if(arg->reg_reg_disp.disp)
+      {
+        fprintf(out, "+%d]", arg->reg_disp.disp);
+      }
+      else
+      {
+        fprintf(out, "]");
+      }
+
       break;
     case ArgMemRegRegDisp:
       fprintf(out, "[");
       _print_reg(arg->reg_reg_disp.r1, out);
       fprintf(out, "+");
       _print_reg(arg->reg_reg_disp.r2, out);
-      fprintf(out, "+%d]", arg->reg_reg_disp.disp);
+      if(arg->reg_reg_disp.disp)
+      {
+        fprintf(out, "+%d]", arg->reg_reg_disp.disp);
+      }
+      else
+      {
+        fprintf(out, "]");
+      }
+
       break;
   }
 }
