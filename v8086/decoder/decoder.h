@@ -57,8 +57,7 @@ enum DispType
   Disp16,
 };
 
-struct RegDisp{
-  Register r1;
+struct Displacement{
   DispType t;
   union{
     s8 disp8;
@@ -66,14 +65,15 @@ struct RegDisp{
   };
 };
 
+struct RegDisp{
+  Register r1;
+  Displacement disp;
+};
+
 struct RegRegDisp{
   Register r1;
   Register r2;
-  DispType t;
-  union{
-    s8 disp8;
-    s16 disp16;
-  };
+  Displacement disp;
 };
 
 struct Arg{
