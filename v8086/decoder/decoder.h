@@ -11,6 +11,26 @@
   X(sub)\
   X(sbb)\
   X(cmp)\
+  X(jz)\
+  X(jl)\
+  X(jle)\
+  X(jb)\
+  X(jbe)\
+  X(jp)\
+  X(jo)\
+  X(js)\
+  X(jnz)\
+  X(jnl)\
+  X(jnle)\
+  X(jnb)\
+  X(jnbe)\
+  X(jnp)\
+  X(jno)\
+  X(jns)\
+  X(loop)\
+  X(loopz)\
+  X(loopnz)\
+  X(jcxz)\
 
 enum Opcode
 {
@@ -48,6 +68,7 @@ enum Register : u16
 
 enum ArgType
 {
+  ArgInvalid,
   ArgReg,
   ArgMem,
   ArgImm8,

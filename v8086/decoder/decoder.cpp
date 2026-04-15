@@ -635,6 +635,46 @@ bad:
   return res;
 }
 
+#define TEMPLATE_DECODER_JMP(name, opcode)                                                        \
+static u32 _decode_##name (                                                                       \
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)                               \
+{                                                                                                 \
+  u8 res=1;                                                                                       \
+  s8 written;                                                                                     \
+  UNUSED(first_byte);                                                                             \
+  out->op = opcode;                                                                               \
+  written = _imm_to_arg(mem, size, 0, &out->args[0]);                                             \
+  if(written<0) goto bad;                                                                         \
+  res+=written;                                                                                   \
+  return res;                                                                                     \
+bad:                                                                                              \
+  res =0;                                                                                         \
+  out->op = Opcode::INVALID;                                                                      \
+  return res;                                                                                     \
+}
+
+TEMPLATE_DECODER_JMP(je_jz, jz)
+TEMPLATE_DECODER_JMP(jl_jnge, jz)
+TEMPLATE_DECODER_JMP(jle_jng, jle)
+TEMPLATE_DECODER_JMP(jb_jnae, jb)
+TEMPLATE_DECODER_JMP(jbe_jna, jbe)
+TEMPLATE_DECODER_JMP(jp_jpe, jp)
+TEMPLATE_DECODER_JMP(jo, jo)
+TEMPLATE_DECODER_JMP(js, js)
+TEMPLATE_DECODER_JMP(jne_jnz, jnz)
+TEMPLATE_DECODER_JMP(jnl_jge, jnl)
+TEMPLATE_DECODER_JMP(jnle_jg, jnle)
+TEMPLATE_DECODER_JMP(jnb_jae, jnb)
+TEMPLATE_DECODER_JMP(jnbe_ja, jnbe)
+TEMPLATE_DECODER_JMP(jnp_jpo, jnp)
+TEMPLATE_DECODER_JMP(jno, jno)
+TEMPLATE_DECODER_JMP(jns, jns)
+TEMPLATE_DECODER_JMP(loop, loop)
+TEMPLATE_DECODER_JMP(loopz_loope, loopz)
+TEMPLATE_DECODER_JMP(loopnz_loopne, loopnz)
+TEMPLATE_DECODER_JMP(jcxz, jcxz)
+
+
 __attribute__((constructor))
 static void _init_decoders_table(void) 
 {
@@ -702,6 +742,27 @@ static void _init_decoders_table(void)
   {
     decoders[0b00111100 + i] = _decode_cmp_imm_to_acc;
   }
+
+  decoders[0b01110100] = _decode_je_jz;
+  decoders[0b01111100] = _decode_jl_jnge;
+  decoders[0b01111110] = _decode_jle_jng;
+  decoders[0b01110010] = _decode_jb_jnae;
+  decoders[0b01110110] = _decode_jbe_jna;
+  decoders[0b01111010] = _decode_jp_jpe;
+  decoders[0b01110000] = _decode_jo;
+  decoders[0b01111000] = _decode_js;
+  decoders[0b01110101] = _decode_jne_jnz;
+  decoders[0b01111101] = _decode_jnl_jge;
+  decoders[0b01111111] = _decode_jnle_jg;
+  decoders[0b01110011] = _decode_jnb_jae;
+  decoders[0b01110111] = _decode_jnbe_ja;
+  decoders[0b01111011] = _decode_jnp_jpo;
+  decoders[0b01110001] = _decode_jno;
+  decoders[0b01111001] = _decode_jns;
+  decoders[0b11100010] = _decode_loop;
+  decoders[0b11100001] = _decode_loopz_loope;
+  decoders[0b11100000] = _decode_loopnz_loopne;
+  decoders[0b11100011] = _decode_jcxz;
 }
 
 static void _print_reg(const Register reg, FILE* out)
@@ -759,9 +820,11 @@ static void _print_arg(const Arg* const arg, FILE* out)
       _print_reg(arg->reg_reg_disp.r2, out);
       _print_disp(&arg->reg_reg_disp.disp, out);
       fprintf(out, "]");
-
       break;
-  }
+
+    case ArgInvalid:
+      break;
+    }
 }
 
 void InstructionPrint(const Instruction& instr, FILE* out)
