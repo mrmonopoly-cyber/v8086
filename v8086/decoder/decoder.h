@@ -51,15 +51,29 @@ enum ArgType
   ArgMemRegRegDisp,
 };
 
+enum DispType
+{
+  Disp8,
+  Disp16,
+};
+
 struct RegDisp{
   Register r1;
-  u16 disp;
+  DispType t;
+  union{
+    s8 disp8;
+    s16 disp16;
+  };
 };
 
 struct RegRegDisp{
   Register r1;
   Register r2;
-  u16 disp;
+  DispType t;
+  union{
+    s8 disp8;
+    s16 disp16;
+  };
 };
 
 struct Arg{
@@ -67,8 +81,8 @@ struct Arg{
   union{
     Register reg;
     u32 addr;
-    u8 imm8;
-    u16 imm16;
+    s8 imm8;
+    s16 imm16;
     RegDisp reg_disp;
     RegRegDisp reg_reg_disp;
   };

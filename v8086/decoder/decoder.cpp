@@ -69,9 +69,9 @@ static inline u8 _get_rm_field(const u8 byte)
   return (byte >> 0) & 0x7;
 }
 
-static inline u8 _mod_rm_to_arg(ModField mod, u8 rm, u8 w, Arg* out)
+static inline s8 _mod_rm_to_arg(const u8* mem, u8 size, ModField mod, u8 rm, u8 w, Arg* out)
 {
-  u8 res = mod;
+  s8 res = mod;
 
   switch (rm)
   {
@@ -126,11 +126,15 @@ static inline u8 _mod_rm_to_arg(ModField mod, u8 rm, u8 w, Arg* out)
     case MemModeX:
       if(rm == 0b110)
       {
+        if(size < 2) goto bad;
         out->t = ArgMem;
+        out->addr = (mem[1] << 8) + mem[0];
+        res=2;
       }
       else if(rm < 0b100)
       {
         out->t = ArgMemRegRegDisp;
+        res=0;
       }
       else
       {
@@ -139,23 +143,35 @@ static inline u8 _mod_rm_to_arg(ModField mod, u8 rm, u8 w, Arg* out)
       }
       break;
     case MemMode8:
+      if(size < 1) goto bad;
+      res=1;
       if(rm < 0b100)
       {
         out->t = ArgMemRegRegDisp;
+        out->reg_reg_disp.t = Disp8;
+        out->reg_reg_disp.disp8 = mem[0];
       }
       else
       {
         out->t = ArgMemRegDisp;
+        out->reg_disp.t = Disp8;
+        out->reg_disp.disp16 = mem[0];
       }
       break;
     case MemMode16:
+      if(size < 2) goto bad;
+      res=2;
       if(rm < 0b100)
       {
         out->t = ArgMemRegRegDisp;
+        out->reg_reg_disp.t = Disp16;
+        out->reg_reg_disp.disp16 = (mem[1] << 8) + mem[0];
       }
       else
       {
         out->t = ArgMemRegDisp;
+        out->reg_disp.t = Disp16;
+        out->reg_disp.disp16 = (mem[1] << 8) + mem[0];
       }
       break;
     case RegMode:
@@ -164,6 +180,10 @@ static inline u8 _mod_rm_to_arg(ModField mod, u8 rm, u8 w, Arg* out)
       break;
   }
 
+  return res;
+
+bad:
+  res =-1;
   return res;
 }
 
@@ -226,7 +246,7 @@ static u32 _decode_mov_reg_mem_to_from_reg(
   u8 rm;
   Arg arg1;
   Arg arg2;
-  u8 written=0;
+  s8 written=0;
 
   if(size <= 0) goto bad;
 
@@ -241,19 +261,9 @@ static u32 _decode_mov_reg_mem_to_from_reg(
   arg1.t = ArgReg;
   arg1.reg = reg;
 
-  written = _mod_rm_to_arg(mod, rm, w, &arg2);
+  written = _mod_rm_to_arg(mem + 1, size -1, mod, rm, w, &arg2);
+  if(written <0) goto bad;
   res+=written;
-  switch(written)
-  {
-    case 1:
-      if(size <= 1) goto bad;
-      arg2.reg_reg_disp.disp = mem[1];
-      break;
-    case 2:
-      if(size <= 2) goto bad;
-      arg2.reg_reg_disp.disp = (mem[2] << 8) + mem[1];
-      break;
-  }
 
   if(d == 0)
   {
@@ -326,14 +336,15 @@ static void _print_arg(const Arg* const arg, FILE* out)
     case ArgMemRegDisp:
       fprintf(out, "[");
       _print_reg(arg->reg_disp.r1, out);
-      if(arg->reg_reg_disp.disp)
+      if(arg->reg_disp.t == Disp8 && arg->reg_disp.disp8)
       {
-        fprintf(out, "+%d]", arg->reg_disp.disp);
+        fprintf(out, "%+d", arg->reg_disp.disp8);
       }
-      else
+      else if(arg->reg_disp.t == Disp16 && arg->reg_disp.disp16)
       {
-        fprintf(out, "]");
+        fprintf(out, "%+d", arg->reg_disp.disp16);
       }
+      fprintf(out, "]");
 
       break;
     case ArgMemRegRegDisp:
@@ -341,14 +352,16 @@ static void _print_arg(const Arg* const arg, FILE* out)
       _print_reg(arg->reg_reg_disp.r1, out);
       fprintf(out, "+");
       _print_reg(arg->reg_reg_disp.r2, out);
-      if(arg->reg_reg_disp.disp)
+      if(arg->reg_reg_disp.t == Disp8 && arg->reg_reg_disp.disp8)
       {
-        fprintf(out, "+%d]", arg->reg_reg_disp.disp);
+        fprintf(out, "%+d", arg->reg_reg_disp.disp8);
       }
-      else
+      else if(arg->reg_reg_disp.t == Disp16 && arg->reg_reg_disp.disp16)
       {
-        fprintf(out, "]");
+        fprintf(out, "%+d", arg->reg_reg_disp.disp16);
       }
+
+      fprintf(out, "]");
 
       break;
   }
