@@ -5,7 +5,12 @@
 #include <v8086_definitions.h>
 
 #define OPS \
-  X(mov)
+  X(mov)\
+  X(add)\
+  X(adc)\
+  X(sub)\
+  X(sbb)\
+  X(cmp)\
 
 enum Opcode
 {
