@@ -619,7 +619,7 @@ bad:
   return res;
 }
 
-static u32 _decode_dec_reg_mem(
+static u32 _decode_neg_reg_mem(
     const u8 first_byte, const u8* mem, u32 size, Instruction* out)
 {
   u8 res=1;
@@ -629,7 +629,7 @@ static u32 _decode_dec_reg_mem(
   ModField mod;
   u8 rm;
 
-  out->op = Opcode::dec;
+  out->op = Opcode::neg;
 
   if(size < 1) goto bad;
   snd_byte = mem[0];
@@ -677,7 +677,7 @@ static u32 _decode_indirect_intersegment(
       return _decode_inc_dec_reg_mem(first_byte, mem, size, out);
       break;
     case 0b001:
-      return _decode_dec_reg_mem(first_byte, mem, size, out);
+      return _decode_inc_dec_reg_mem(first_byte, mem, size, out);
       break;
     case 0b110:
       out->op = Opcode::push;
@@ -785,24 +785,17 @@ static u32 _decode_pop_reg_mem(
   ModField mod;
   u8 rm;
   s8 written;
-
   UNUSED(first_byte);
-
   if(size < 1) goto bad;
   snd_byte = mem[0];
   res++;
-
   out->op = Opcode::pop;
-
   mod = _get_mod_field(snd_byte);
   rm = _get_rm_field(snd_byte);
-
   written = _mod_rm_to_arg(mem + res, size - res, mod, rm, 0, &out->args[0]);
   if(written<0) goto bad;
   res+=written;
-
   return res + 1;
-
 bad:
   res =0;
   out->op = Opcode::INVALID;
@@ -1018,7 +1011,7 @@ static void _init_decoders_table(void)
     decoders[i] = _decode_invalid;
   }
 
-  for(u8 i=0; i<4; i++)
+  for(u8 i=0; i<=0b11; i++)
   {
     decoders[0b10001000 + i] = _decode_mov_reg_mem_to_from_reg;
   }
@@ -1195,6 +1188,11 @@ static void _init_decoders_table(void)
   decoders[0b11100000] = _decode_loopnz_loopne;
   decoders[0b11100011] = _decode_jcxz;
 
+  for(u8 i=0; i<= 0b1; i++)
+  {
+    decoders[0b11110110 | i] = _decode_neg_reg_mem;
+  }
+
   decoders[0b11111110] = _decode_inc_dec_reg_mem;
 
   decoders[0b11111111] = _decode_indirect_intersegment;
@@ -1321,7 +1319,7 @@ void InstructionPrint(const Instruction& instr, FILE* out_f)
         fprintf(out_f, "word ");
     }
   }
-  else if((instr.op == Opcode::inc || instr.op == Opcode::dec))
+  else if((instr.op == Opcode::inc || instr.op == Opcode::dec || instr.op == Opcode::neg))
   {
     if(instr.args[0].t == ArgMemRegDisp)
     {
@@ -1350,10 +1348,34 @@ void InstructionPrint(const Instruction& instr, FILE* out_f)
       fprintf(out_f, "word ");
     }
   }
-  else if(instr.args[0].t != ArgReg  && (instr.op == Opcode::push || instr.op == Opcode::push))
+  else if
+    (
+      instr.args[0].t != ArgReg && 
+      instr.args[0].t != ArgSegment &&
+      (instr.op == Opcode::push || instr.op == Opcode::pop)
+    )
   {
     fprintf(out_f, "word ");
   }
+  else if(!instr.args[1].t)
+  {
+    if(
+        (instr.args[0].t == ArgMemRegDisp && instr.args[0].reg_disp.disp.word) ||
+        (instr.args[0].t == ArgMemRegRegDisp && instr.args[0].reg_reg_disp.disp.word)
+      )
+    {
+      fprintf(out_f, "word ");
+    }
+    else if(
+        (instr.args[0].t == ArgMemRegDisp && !instr.args[0].reg_disp.disp.word) ||
+        (instr.args[0].t == ArgMemRegRegDisp && !instr.args[0].reg_reg_disp.disp.word)
+      )
+    {
+      fprintf(out_f, "byte ");
+    }
+
+  }
+
 
   _print_arg(&instr.args[0], out_f);
   if(instr.args[1].t)

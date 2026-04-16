@@ -50,6 +50,7 @@
   X(dec)\
   X(aaa)\
   X(daa)\
+  X(neg)\
 
 enum Opcode
 {
