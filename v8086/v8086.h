@@ -20,10 +20,10 @@ struct ProgramOptInfo{
 
 enum ProgSegments
 {
-  CS=0,
-  SS,
-  DS,
-  ES,
+  ProgCS=0,
+  ProgSS,
+  ProgDS,
+  ProgES,
 
   __ProgSegments_Count
 };

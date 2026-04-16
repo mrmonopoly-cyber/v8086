@@ -31,6 +31,25 @@
   X(loopz)\
   X(loopnz)\
   X(jcxz)\
+  X(call)\
+  X(jmp)\
+  X(push)\
+  X(pop)\
+  X(xchg)\
+  X(in)\
+  X(out)\
+  X(xlat)\
+  X(lea)\
+  X(lds)\
+  X(les)\
+  X(lahf)\
+  X(sahf)\
+  X(pushf)\
+  X(popf)\
+  X(inc)\
+  X(dec)\
+  X(aaa)\
+  X(daa)\
 
 enum Opcode
 {
@@ -66,15 +85,25 @@ enum Register : u16
 #undef X
 };
 
+enum Segment{
+  ES = 0b00,
+  CS = 0b01,
+  SS = 0b10,
+  DS = 0b11,
+};
+
 enum ArgType
 {
   ArgInvalid,
   ArgReg,
   ArgMem,
+  ArgUImm8,
+  ArgUImm16,
   ArgImm8,
   ArgImm16,
   ArgMemRegDisp,
   ArgMemRegRegDisp,
+  ArgSegment,
 };
 
 enum DispType
@@ -89,6 +118,7 @@ struct Displacement{
     s8 disp8;
     s16 disp16;
   };
+  u8 word;
 };
 
 struct RegDisp{
@@ -106,7 +136,10 @@ struct Arg{
   ArgType t;
   union{
     Register reg;
+    Segment seg;
     u32 addr;
+    u8 uimm8;
+    u16 uimm16;
     s8 imm8;
     s16 imm16;
     RegDisp reg_disp;

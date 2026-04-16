@@ -1,7 +1,7 @@
 #include "decoder.h"
 
-#include <cassert>
-#include <cstring>
+#include <assert.h>
+#include <string.h>
 #include <stdio.h>
 
 #include <v8086_definitions.h>
@@ -31,7 +31,7 @@ static Register regs_dec[][2]
   {bh, di},
 };
 
-static f_instruction_decoder decoders[255];
+static f_instruction_decoder decoders[256];
 
 static u32 _decode_invalid(const u8 first_byte, const u8* mem, const u32 size, Instruction* out)
 {
@@ -140,11 +140,13 @@ static inline s8 _mod_rm_to_arg(const u8* mem, u8 size, ModField mod, u8 rm, u8 
       else if(rm < 0b100)
       {
         out->t = ArgMemRegRegDisp;
+        out->reg_reg_disp.disp.word = !w;
         res=0;
       }
       else
       {
         out->t = ArgMemRegDisp;
+        out->reg_disp.disp.word = !w;
         res=0;
       }
       break;
@@ -156,12 +158,14 @@ static inline s8 _mod_rm_to_arg(const u8* mem, u8 size, ModField mod, u8 rm, u8 
         out->t = ArgMemRegRegDisp;
         out->reg_reg_disp.disp.t = Disp8;
         out->reg_reg_disp.disp.disp8 = mem[0];
+        out->reg_reg_disp.disp.word = w;
       }
       else
       {
         out->t = ArgMemRegDisp;
         out->reg_disp.disp.t = Disp8;
         out->reg_disp.disp.disp16 = mem[0];
+        out->reg_disp.disp.word = w;
       }
       break;
     case MemMode16:
@@ -172,12 +176,14 @@ static inline s8 _mod_rm_to_arg(const u8* mem, u8 size, ModField mod, u8 rm, u8 
         out->t = ArgMemRegRegDisp;
         out->reg_reg_disp.disp.t = Disp16;
         out->reg_reg_disp.disp.disp16 = (mem[1] << 8) + mem[0];
+        out->reg_reg_disp.disp.word = w;
       }
       else
       {
         out->t = ArgMemRegDisp;
         out->reg_disp.disp.t = Disp16;
         out->reg_disp.disp.disp16 = (mem[1] << 8) + mem[0];
+        out->reg_disp.disp.word = w;
       }
       break;
     case RegMode:
@@ -461,49 +467,31 @@ bad:
   return res;
 }
 
-static u32 _decode_mov_reg_mem_to_from_reg(
-    const u8 first_byte, const u8* mem, const u32 size, Instruction* out)
-{
-  u32 res=1;
-  const u8 w = _get_w_bit(first_byte);
-  const u8 d = _get_d_bit(first_byte);
-  s8 written=0;
-
-  out->op = Opcode::mov;
-
-  written = _reg_mem_to_either(mem, size, w, d, out);
-  if(written < 0) goto bad;
-  res+=written;
-
-  return res;
-
-bad:
-  res=0;
-  out->op = Opcode::INVALID;
-  return res;
+#define DECODE_REG_MEM_TO_EITHER(opcode)                                        \
+static u32 _decode_##opcode##_reg_mem_to_from_reg(                              \
+    const u8 first_byte, const u8* mem, const u32 size, Instruction* out)       \
+{                                                                               \
+  u32 res=1;                                                                    \
+  const u8 w = _get_w_bit(first_byte);                                          \
+  const u8 d = _get_d_bit(first_byte);                                          \
+  s8 written=0;                                                                 \
+  out->op = Opcode::opcode;                                                     \
+  written = _reg_mem_to_either(mem, size, w, d, out);                           \
+  if(written < 0) goto bad;                                                     \
+  res+=written;                                                                 \
+  return res;                                                                   \
+bad:                                                                            \
+  res=0;                                                                        \
+  out->op = Opcode::INVALID;                                                    \
+  return res;                                                                   \
 }
 
-static u32 _decode_add_reg_mem_with_reg_to_either(
-    const u8 first_byte, const u8* mem, const u32 size, Instruction* out)
-{
-  u32 res=1;
-  const u8 w = _get_w_bit(first_byte);
-  const u8 s = _get_d_bit(first_byte);
-  s8 written=0;
-
-  out->op = Opcode::add;
-
-  written = _reg_mem_to_either(mem, size, w, s, out);
-  if(written < 0) goto bad;
-  res+=written;
-
-  return res;
-
-bad:
-  res=0;
-  out->op = Opcode::INVALID;
-  return res;
-}
+DECODE_REG_MEM_TO_EITHER(mov);
+DECODE_REG_MEM_TO_EITHER(add);
+DECODE_REG_MEM_TO_EITHER(adc);
+DECODE_REG_MEM_TO_EITHER(sub);
+DECODE_REG_MEM_TO_EITHER(sbb);
+DECODE_REG_MEM_TO_EITHER(cmp);
 
 static u32 _decode_arithm_imm_to_reg_mem(
     const u8 first_byte, const u8* mem, const u32 size, Instruction* out)
@@ -525,115 +513,29 @@ bad:
   return res;
 }
 
-static u32 _decode_add_imm_to_acc(
-    const u8 first_byte, const u8* mem, u32 size, Instruction* out)
-{
-  u8 res=1;
-  const u8 w = _get_w_bit(first_byte);
-  s8 written;
-
-  out->op = Opcode::add;
-
-  written = _imm_to_acc(mem, size, w, out);
-  if(written < 0) goto bad;
-  res+=written;
-
-
-  return res;
-
-bad:
-  res =0;
-  out->op = Opcode::INVALID;
-  return res;
+#define DECODE_ARITH_IMM_TO_ACC(opcode)                                         \
+static u32 _decode_##opcode##_imm_to_acc(                                       \
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)             \
+{                                                                               \
+  u8 res=1;                                                                     \
+  const u8 w = _get_w_bit(first_byte);                                          \
+  s8 written;                                                                   \
+  out->op = Opcode::opcode;                                                     \
+  written = _imm_to_acc(mem, size, w, out);                                     \
+  if(written < 0) goto bad;                                                     \
+  res+=written;                                                                 \
+  return res;                                                                   \
+bad:                                                                            \
+  res =0;                                                                       \
+  out->op = Opcode::INVALID;                                                    \
+  return res;                                                                   \
 }
 
-static u32 _decode_sub_reg_mem_with_reg_to_either(
-    const u8 first_byte, const u8* mem, const u32 size, Instruction* out)
-{
-  u32 res=1;
-  const u8 w = _get_w_bit(first_byte);
-  const u8 d = _get_d_bit(first_byte);
-  s8 written=0;
-
-  out->op = Opcode::sub;
-
-  written = _reg_mem_to_either(mem, size, w, d, out);
-  if(written < 0) goto bad;
-  res+=written;
-
-  return res;
-
-bad:
-  res=0;
-  out->op = Opcode::INVALID;
-  return res;
-}
-
-static u32 _decode_sub_imm_to_acc(
-    const u8 first_byte, const u8* mem, u32 size, Instruction* out)
-{
-  u8 res=1;
-  const u8 w = _get_w_bit(first_byte);
-  s8 written;
-
-  out->op = Opcode::sub;
-
-  written = _imm_to_acc(mem, size, w, out);
-  if(written < 0) goto bad;
-  res+=written;
-
-
-  return res;
-
-bad:
-  res =0;
-  out->op = Opcode::INVALID;
-  return res;
-}
-
-static u32 _decode_cmp_reg_mem_with_reg_to_either(
-    const u8 first_byte, const u8* mem, const u32 size, Instruction* out)
-{
-  u32 res=1;
-  const u8 w = _get_w_bit(first_byte);
-  const u8 d = _get_d_bit(first_byte);
-  s8 written=0;
-
-  out->op = Opcode::cmp;
-
-  written = _reg_mem_to_either(mem, size, w, d, out);
-  if(written < 0) goto bad;
-  res+=written;
-
-  return res;
-
-bad:
-  res=0;
-  out->op = Opcode::INVALID;
-  return res;
-}
-
-static u32 _decode_cmp_imm_to_acc(
-    const u8 first_byte, const u8* mem, u32 size, Instruction* out)
-{
-  u8 res=1;
-  const u8 w = _get_w_bit(first_byte);
-  s8 written;
-
-  out->op = Opcode::cmp;
-
-  written = _imm_to_acc(mem, size, w, out);
-  if(written < 0) goto bad;
-  res+=written;
-
-
-  return res;
-
-bad:
-  res =0;
-  out->op = Opcode::INVALID;
-  return res;
-}
+DECODE_ARITH_IMM_TO_ACC(add);
+DECODE_ARITH_IMM_TO_ACC(adc);
+DECODE_ARITH_IMM_TO_ACC(sub);
+DECODE_ARITH_IMM_TO_ACC(sbb);
+DECODE_ARITH_IMM_TO_ACC(cmp);
 
 #define TEMPLATE_DECODER_JMP(name, opcode)                                                        \
 static u32 _decode_##name (                                                                       \
@@ -675,6 +577,439 @@ TEMPLATE_DECODER_JMP(loopnz_loopne, loopnz)
 TEMPLATE_DECODER_JMP(jcxz, jcxz)
 
 
+static u32 _decode_inc_dec_reg_mem(
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)
+{
+  u8 res=1;
+  const u8 w = _get_w_bit(first_byte);
+  u8 snd_byte;
+  s8 written;
+  ModField mod;
+  u8 rm;
+
+
+  if(size < 1) goto bad;
+  snd_byte = mem[0];
+  res++;
+
+  switch ((snd_byte >> 3) & 0x7)
+  {
+    case 0b001:
+      out->op = Opcode::dec;
+      break;
+    case 0b000:
+      out->op = Opcode::inc;
+      break;
+    default:
+      assert(0 && "unreachable _decode_inc_dec_reg_mem");
+  }
+
+  mod = _get_mod_field(snd_byte);
+  rm = _get_rm_field(snd_byte);
+
+  written = _mod_rm_to_arg(mem +1, size -1, mod, rm, w, &out->args[0]);
+  if(written < 0) goto bad;
+  res += written;
+
+  return res;
+
+bad:
+  res =0;
+  out->op = Opcode::INVALID;
+  return res;
+}
+
+static u32 _decode_dec_reg_mem(
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)
+{
+  u8 res=1;
+  const u8 w = _get_w_bit(first_byte);
+  u8 snd_byte;
+  s8 written;
+  ModField mod;
+  u8 rm;
+
+  out->op = Opcode::dec;
+
+  if(size < 1) goto bad;
+  snd_byte = mem[0];
+  res++;
+
+  mod = _get_mod_field(snd_byte);
+  rm = _get_rm_field(snd_byte);
+
+  written = _mod_rm_to_arg(mem +1, size -1, mod, rm, w, &out->args[0]);
+  if(written < 0) goto bad;
+  res += written;
+
+  return res;
+
+bad:
+  res =0;
+  out->op = Opcode::INVALID;
+  return res;
+}
+
+static u32 _decode_indirect_intersegment(
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)
+{
+  u8 res=0;
+  u8 snd_byte;
+  s8 written;
+  ModField mod;
+  u8 specialization;
+  u8 rm;
+
+  UNUSED(first_byte);
+
+  if(size < 1) goto bad;
+
+  snd_byte = mem[0];
+  res++;
+
+  mod = (ModField) ((snd_byte >> 6) & 0x7);
+  specialization = (snd_byte >> 3) & 0x7;
+  rm = snd_byte & 0x7;
+
+  switch (specialization)
+  {
+    case 0b000:
+      return _decode_inc_dec_reg_mem(first_byte, mem, size, out);
+      break;
+    case 0b001:
+      return _decode_dec_reg_mem(first_byte, mem, size, out);
+      break;
+    case 0b110:
+      out->op = Opcode::push;
+      break;
+    case 0b010:
+      out->op = Opcode::call;
+      break;
+    case 0b011:
+      out->op = Opcode::call;
+      break;
+    case 0b100:
+      out->op = Opcode::jmp;
+      break;
+    case 0b101:
+      out->op = Opcode::jmp;
+      break;
+    default:
+      fprintf(stderr, "op: %d\n", specialization);
+      assert(0 && "unreachable _decode_indirect_intersegment" __FILE__);
+
+  }
+
+  written = _mod_rm_to_arg(mem + res, size - res, mod, rm, 0, &out->args[0]);
+  if(written < 0) goto bad;
+  res+=written;
+
+
+  return res + 1;
+
+bad:
+  res =0;
+  out->op = Opcode::INVALID;
+  return res;
+}
+
+static u32 _decode_push_register(
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)
+{
+  u8 res=0;
+  Register reg = regs_dec[first_byte & 0x7][1];
+
+  UNUSED(mem);
+  UNUSED(size);
+
+  out->op = Opcode::push;
+  out->args[0].t = ArgReg;
+  out->args[0].reg = reg;
+
+  return res + 1;
+}
+
+static u32 _decode_pop_register(
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)
+{
+  u8 res=0;
+  Register reg = regs_dec[first_byte & 0x7][1];
+
+  UNUSED(mem);
+  UNUSED(size);
+
+  out->op = Opcode::pop;
+  out->args[0].t = ArgReg;
+  out->args[0].reg = reg;
+
+  return res + 1;
+}
+
+static u32 _decode_push_segment_register(
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)
+{
+  u8 res=0;
+  Segment seg =  (Segment) ((first_byte >> 3) & 0x3);
+
+  UNUSED(mem);
+  UNUSED(size);
+
+  out->op = Opcode::push;
+  out->args[0].t = ArgSegment;
+  out->args[0].seg = seg;
+
+  return res + 1;
+}
+
+static u32 _decode_pop_segment_register(
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)
+{
+  u8 res=0;
+  Segment seg =  (Segment) ((first_byte >> 3) & 0x3);
+
+  UNUSED(mem);
+  UNUSED(size);
+
+  out->op = Opcode::pop;
+  out->args[0].t = ArgSegment;
+  out->args[0].seg = seg;
+
+  return res + 1;
+}
+
+static u32 _decode_pop_reg_mem(
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)
+{
+  u8 res=0;
+  u8 snd_byte;
+  ModField mod;
+  u8 rm;
+  s8 written;
+
+  UNUSED(first_byte);
+
+  if(size < 1) goto bad;
+  snd_byte = mem[0];
+  res++;
+
+  out->op = Opcode::pop;
+
+  mod = _get_mod_field(snd_byte);
+  rm = _get_rm_field(snd_byte);
+
+  written = _mod_rm_to_arg(mem + res, size - res, mod, rm, 0, &out->args[0]);
+  if(written<0) goto bad;
+  res+=written;
+
+  return res + 1;
+
+bad:
+  res =0;
+  out->op = Opcode::INVALID;
+  return res;
+}
+
+static u32 _decode_xchg_reg_mem_with_reg(
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)
+{
+  u8 res=1;
+  s8 written;
+  const u8 w = _get_w_bit(first_byte);
+
+  out->op = Opcode::xchg;
+
+  written = _reg_mem_to_either(mem, size, w, 1, out);
+  if(written<0) goto bad;
+  res += written;
+
+  return res;
+
+bad:
+  res =0;
+  out->op = Opcode::INVALID;
+  return res;
+}
+
+static u32 _decode_xchg_reg_with_acc(
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)
+{
+  u8 res=1;
+  const Register reg = regs_dec[first_byte & 0x7][1];
+
+  UNUSED(mem);
+  UNUSED(size);
+
+  out->op = Opcode::xchg;
+
+  out->args[0].t = ArgReg;
+  out->args[0].reg = ax;
+
+  out->args[1].t = ArgReg;
+  out->args[1].reg = reg;
+
+  return res;
+}
+
+static u32 _decode_in_fixed_port(
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)
+{
+  u8 res=1;
+  const u8 w = _get_w_bit(first_byte);
+  u8 data;
+
+  out->op = Opcode::in;
+
+  if(size < 1) goto bad;
+  data = mem[0];
+  res++;
+
+  out->args[0].t = ArgReg;
+  out->args[0].reg = w ? ax : al;
+
+  out->args[1].t = ArgUImm8;
+  out->args[1].uimm8 = data;
+
+  return res;
+
+bad:
+  res =0;
+  out->op = Opcode::INVALID;
+  return res;
+}
+
+static u32 _decode_in_variable_port(
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)
+{
+  u8 res=1;
+  const u8 w = _get_w_bit(first_byte);
+
+  UNUSED(mem);
+  UNUSED(size);
+
+  out->op = Opcode::in;
+
+  out->args[0].t = ArgReg;
+  out->args[0].reg = w ? ax : al;
+
+  out->args[1].t = ArgReg;
+  out->args[1].reg = dx;
+
+  return res;
+}
+
+static u32 _decode_out_fixed_port(
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)
+{
+  u8 res=1;
+  const u8 w = _get_w_bit(first_byte);
+  u8 data;
+
+  out->op = Opcode::out;
+
+  if(size < 1) goto bad;
+  data = mem[0];
+  res++;
+
+  out->args[0].t = ArgUImm8;
+  out->args[0].uimm8 = data;
+
+  out->args[1].t = ArgReg;
+  out->args[1].reg = w ? ax : al;
+
+
+  return res;
+
+bad:
+  res =0;
+  out->op = Opcode::INVALID;
+  return res;
+}
+
+static u32 _decode_out_variable_port(
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)
+{
+  u8 res=1;
+  const u8 w = _get_w_bit(first_byte);
+
+  UNUSED(mem);
+  UNUSED(size);
+
+  out->op = Opcode::out;
+
+  out->args[0].t = ArgReg;
+  out->args[0].reg = dx;
+
+  out->args[1].t = ArgReg;
+  out->args[1].reg = w ? ax : al;
+
+
+  return res;
+}
+
+#define DECODE_ONLY_FIRST_BYTE(opcode)                                    \
+static u32 _decode_##opcode(                                              \
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)       \
+{                                                                         \
+  u8 res=1;                                                               \
+  UNUSED(mem);                                                            \
+  UNUSED(size);                                                           \
+  UNUSED(first_byte);                                                     \
+  out->op = Opcode::opcode;                                               \
+  return res;                                                             \
+}
+
+DECODE_ONLY_FIRST_BYTE(xlat)
+DECODE_ONLY_FIRST_BYTE(lahf)
+DECODE_ONLY_FIRST_BYTE(sahf)
+DECODE_ONLY_FIRST_BYTE(pushf)
+DECODE_ONLY_FIRST_BYTE(popf)
+DECODE_ONLY_FIRST_BYTE(aaa)
+DECODE_ONLY_FIRST_BYTE(daa)
+
+#define TEMPLATE_LXX_TO_REG(opcode)                                     \
+static u32 _decode_##opcode##_to_reg(                                   \
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)     \
+{                                                                       \
+  u8 res=1;                                                             \
+  s8 written;                                                           \
+  UNUSED(mem);                                                          \
+  UNUSED(size);                                                         \
+  UNUSED(first_byte);                                                   \
+  out->op = Opcode::opcode;                                             \
+  written = _reg_mem_to_either(mem, size, 1, 1, out);                   \
+  if(written < 0) goto bad;                                             \
+  res+=written;                                                         \
+  return res;                                                           \
+bad:                                                                    \
+  res =0;                                                               \
+  out->op = Opcode::INVALID;                                            \
+  return res;                                                           \
+}
+
+TEMPLATE_LXX_TO_REG(lea)
+TEMPLATE_LXX_TO_REG(lds)
+TEMPLATE_LXX_TO_REG(les)
+
+
+
+#define TEMPLATE_ONE_BYTE_REG(opcode)                                             \
+static u32 _decode_##opcode##_reg(                                                \
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)               \
+{                                                                                 \
+  u8 res=1;                                                                       \
+  const Register reg = regs_dec[first_byte & 0x7][1];                             \
+  UNUSED(mem);                                                                    \
+  UNUSED(size);                                                                   \
+  out->op = Opcode::opcode;                                                       \
+  out->args[0].t = ArgReg;                                                        \
+  out->args[0].reg = reg;                                                         \
+  return res;                                                                     \
+}
+
+TEMPLATE_ONE_BYTE_REG(inc);
+TEMPLATE_ONE_BYTE_REG(dec);
+
+
 __attribute__((constructor))
 static void _init_decoders_table(void) 
 {
@@ -710,7 +1045,12 @@ static void _init_decoders_table(void)
 
   for(u8 i=0; i<= 0b11; i++)
   {
-    decoders[0b00000000 + i] = _decode_add_reg_mem_with_reg_to_either;
+    decoders[0b00000000 + i] = _decode_add_reg_mem_to_from_reg;
+  }
+
+  for(u8 i=0; i<= 0b11; i++)
+  {
+    decoders[0b00010000 + i] = _decode_adc_reg_mem_to_from_reg;
   }
 
   for(u8 i=0; i<= 0b11; i++)
@@ -723,9 +1063,19 @@ static void _init_decoders_table(void)
     decoders[0b00000100 + i] = _decode_add_imm_to_acc;
   }
 
+  for(u8 i=0; i<= 0b1; i++)
+  {
+    decoders[0b00010100 + i] = _decode_adc_imm_to_acc;
+  }
+
   for(u8 i=0; i<= 0b11; i++)
   {
-    decoders[0b00101000 + i] = _decode_sub_reg_mem_with_reg_to_either;
+    decoders[0b00101000 + i] = _decode_sub_reg_mem_to_from_reg;
+  }
+
+  for(u8 i=0; i<= 0b11; i++)
+  {
+    decoders[0b00011000 + i] = _decode_sbb_reg_mem_to_from_reg;
   }
 
   for(u8 i=0; i<= 0b1; i++)
@@ -733,15 +1083,96 @@ static void _init_decoders_table(void)
     decoders[0b00101100 + i] = _decode_sub_imm_to_acc;
   }
 
+  for(u8 i=0; i<= 0b1; i++)
+  {
+    decoders[0b00011100 + i] = _decode_sbb_imm_to_acc;
+  }
+
   for(u8 i=0; i<= 0b11; i++)
   {
-    decoders[0b00111000 + i] = _decode_cmp_reg_mem_with_reg_to_either;
+    decoders[0b00111000 + i] = _decode_cmp_reg_mem_to_from_reg;
   }
 
   for(u8 i=0; i<= 0b1; i++)
   {
     decoders[0b00111100 + i] = _decode_cmp_imm_to_acc;
   }
+
+  for(u8 i=0; i<= 0b111; i++)
+  {
+    decoders[0b01010000 + i] = _decode_push_register;
+  }
+
+  for(u8 i=0; i<= 0b111; i++)
+  {
+    decoders[0b01011000 + i] = _decode_pop_register;
+  }
+
+  for(u8 i=0; i<= 0b11; i++)
+  {
+    decoders[0b00000111 | (i << 3)] = _decode_pop_segment_register;
+  }
+
+  for(u8 i=0; i<= 0b11; i++)
+  {
+    decoders[0b00000110 | (i << 3)] = _decode_push_segment_register;
+  }
+
+  decoders[0b10001111] = _decode_pop_reg_mem;
+
+  for(u8 i=0; i<= 0b1; i++)
+  {
+    decoders[0b10000110 + i] = _decode_xchg_reg_mem_with_reg;
+  }
+
+  for(u8 i=0; i<= 0b111; i++)
+  {
+    decoders[0b10010000 + i] = _decode_xchg_reg_with_acc;
+  }
+
+  for(u8 i=0; i<= 0b1; i++)
+  {
+    decoders[0b11100100 + i] = _decode_in_fixed_port;
+  }
+
+  for(u8 i=0; i<= 0b1; i++)
+  {
+    decoders[0b11101100 + i] = _decode_in_variable_port;
+  }
+
+  for(u8 i=0; i<= 0b1; i++)
+  {
+    decoders[0b11100110 + i] = _decode_out_fixed_port;
+  }
+
+  for(u8 i=0; i<= 0b1; i++)
+  {
+    decoders[0b11101110 + i] = _decode_out_variable_port;
+  }
+
+  for(u8 i=0; i<= 0b111; i++)
+  {
+    decoders[0b01000000 | i] = _decode_inc_reg;
+  }
+
+  for(u8 i=0; i<= 0b111; i++)
+  {
+    decoders[0b01001000 | i] = _decode_dec_reg;
+  }
+
+  decoders[0b11010111] = _decode_xlat;
+
+  decoders[0b10011111] = _decode_lahf;
+  decoders[0b10011110] = _decode_sahf;
+  decoders[0b10011100] = _decode_pushf;
+  decoders[0b10011101] = _decode_popf;
+
+  decoders[0b00110111] = _decode_aaa;
+  decoders[0b00100111] = _decode_daa;
+
+  decoders[0b10001101] = _decode_lea_to_reg;
+  decoders[0b11000101] = _decode_lds_to_reg;
+  decoders[0b11000100] = _decode_les_to_reg;
 
   decoders[0b01110100] = _decode_je_jz;
   decoders[0b01111100] = _decode_jl_jnge;
@@ -763,6 +1194,10 @@ static void _init_decoders_table(void)
   decoders[0b11100001] = _decode_loopz_loope;
   decoders[0b11100000] = _decode_loopnz_loopne;
   decoders[0b11100011] = _decode_jcxz;
+
+  decoders[0b11111110] = _decode_inc_dec_reg_mem;
+
+  decoders[0b11111111] = _decode_indirect_intersegment;
 }
 
 static void _print_reg(const Register reg, FILE* out)
@@ -806,6 +1241,12 @@ static void _print_arg(const Arg* const arg, FILE* out)
     case ArgImm16:
       fprintf(out, "%d", arg->imm16);
       break;
+    case ArgUImm8:
+      fprintf(out, "%d", arg->uimm8);
+      break;
+    case ArgUImm16:
+      fprintf(out, "%d", arg->uimm16);
+      break;
     case ArgMemRegDisp:
       fprintf(out, "[");
       _print_reg(arg->reg_disp.r1, out);
@@ -822,26 +1263,44 @@ static void _print_arg(const Arg* const arg, FILE* out)
       fprintf(out, "]");
       break;
 
+    case ArgSegment:
+      switch (arg->seg) {
+        case ES:
+          fprintf(out, "es");
+          break;
+        case SS:
+          fprintf(out, "ss");
+          break;
+        case CS:
+          fprintf(out, "cs");
+          break;
+        case DS:
+          fprintf(out, "ds");
+          break;
+      }
+      break;
+
     case ArgInvalid:
+      break;
       break;
     }
 }
 
-void InstructionPrint(const Instruction& instr, FILE* out)
+void InstructionPrint(const Instruction& instr, FILE* out_f)
 {
-  assert(out);
+  assert(out_f);
 
   switch (instr.op)
   {
-#define X(OP) case OP:  fprintf(out, #OP); break;
+#define X(OP) case OP:  fprintf(out_f, #OP); break;
     OPS
 #undef X
     case INVALID:
-      fprintf(out, "INVALID OP");
+      fprintf(out_f, "INVALID OP");
       break;
   }
 
-  fprintf(out, " ");
+  fprintf(out_f, " ");
 
   if(instr.args[1].t == ArgImm8 || instr.args[1].t == ArgImm16)
   {
@@ -851,7 +1310,7 @@ void InstructionPrint(const Instruction& instr, FILE* out)
         (instr.args[0].t == ArgMemRegRegDisp && instr.args[0].reg_reg_disp.disp.t == DispType::Disp8)
       )
     {
-        fprintf(out, "byte ");
+        fprintf(out_f, "byte ");
     }
     else if
       (
@@ -859,14 +1318,50 @@ void InstructionPrint(const Instruction& instr, FILE* out)
         (instr.args[0].t == ArgMemRegRegDisp && instr.args[0].reg_reg_disp.disp.t == DispType::Disp16)
       )
     {
-        fprintf(out, "word ");
+        fprintf(out_f, "word ");
     }
   }
+  else if((instr.op == Opcode::inc || instr.op == Opcode::dec))
+  {
+    if(instr.args[0].t == ArgMemRegDisp)
+    {
+      if(instr.args[0].reg_disp.disp.word)
+      {
+        fprintf(out_f, "word ");
+      }
+      else
+      {
+        fprintf(out_f, "byte ");
+      }
+    }
+    else if(instr.args[0].t == ArgMemRegRegDisp)
+    {
+      if(instr.args[0].reg_reg_disp.disp.word)
+      {
+        fprintf(out_f, "word ");
+      }
+      else
+      {
+        fprintf(out_f, "byte ");
+      }
+    }
+    else if(instr.args[0].t == ArgMem)
+    {
+      fprintf(out_f, "word ");
+    }
+  }
+  else if(instr.args[0].t != ArgReg  && (instr.op == Opcode::push || instr.op == Opcode::push))
+  {
+    fprintf(out_f, "word ");
+  }
 
-  _print_arg(&instr.args[0], out);
-  fprintf(out, ", ");
-  _print_arg(&instr.args[1], out);
-  fprintf(out, "\n");
+  _print_arg(&instr.args[0], out_f);
+  if(instr.args[1].t)
+  {
+    fprintf(out_f, ", ");
+    _print_arg(&instr.args[1], out_f);
+  }
+  fprintf(out_f, "\n");
 }
 
 u32 InstructionDecode(const u8* mem, const u32 mem_size, Instruction* const out)
