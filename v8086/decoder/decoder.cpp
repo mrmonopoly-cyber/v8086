@@ -1047,6 +1047,41 @@ TEMPLATE_DECODE_ONLY_FIRST_BYTE(das)
 TEMPLATE_DECODE_ONLY_FIRST_BYTE(cbw);
 TEMPLATE_DECODE_ONLY_FIRST_BYTE(cwd);
 TEMPLATE_DECODE_ONLY_FIRST_BYTE(ret);
+TEMPLATE_DECODE_ONLY_FIRST_BYTE(int3);
+TEMPLATE_DECODE_ONLY_FIRST_BYTE(into);
+TEMPLATE_DECODE_ONLY_FIRST_BYTE(iret);
+TEMPLATE_DECODE_ONLY_FIRST_BYTE(clc);
+TEMPLATE_DECODE_ONLY_FIRST_BYTE(cmc);
+TEMPLATE_DECODE_ONLY_FIRST_BYTE(stc);
+TEMPLATE_DECODE_ONLY_FIRST_BYTE(cld);
+TEMPLATE_DECODE_ONLY_FIRST_BYTE(std);
+TEMPLATE_DECODE_ONLY_FIRST_BYTE(cli);
+TEMPLATE_DECODE_ONLY_FIRST_BYTE(sti);
+TEMPLATE_DECODE_ONLY_FIRST_BYTE(hlt);
+TEMPLATE_DECODE_ONLY_FIRST_BYTE(wait);
+
+static u32 _decode_int_type_specified(
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)
+{
+  u8 res=1;
+
+  UNUSED(first_byte);
+
+  if( size < 1 ) goto bad;
+  res++;
+
+  out->op = Opcode::OpInt;
+
+  out->args[0].t = ArgImm8;
+  out->args[0].imm8 =  mem[0];
+
+  return res;
+
+bad:
+  res =0;
+  out->op = Opcode::INVALID;
+  return res;
+}
 
 static u32 _decode_ret_XX_seg_add_imm_to_sp(
     const u8 first_byte, const u8* mem, u32 size, Instruction* out)
@@ -1205,7 +1240,7 @@ bad:
   return res;
 }
 
-static u32 _decode_repete(
+static u32 _decode_repeate(
     const u8 first_byte, const u8* mem, u32 size, Instruction* out)
 {
   u8 res=1;
@@ -1235,6 +1270,33 @@ static u32 _decode_repete(
     case RepArgOp::stosb: out->op = Opcode::stosb; break;
     case RepArgOp::stosw: out->op = Opcode::stosw; break;
   }
+
+  return res;
+
+bad:
+  res =0;
+  out->op = Opcode::INVALID;
+  return res;
+}
+
+static u32 _decode_lock(
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)
+{
+  u8 res=0;
+  u8 snd_byte;
+  s8 written;
+
+  UNUSED(first_byte);
+
+  out->prefix = Prefix::lock;
+
+  if( size < 1 ) goto bad;
+  snd_byte = mem[0];
+  res++;
+
+  written = decoders[snd_byte](snd_byte, mem +1, size -1, out);
+  if(written <0) goto bad;
+  res+=written;
 
   return res;
 
@@ -1539,8 +1601,25 @@ static void _init_decoders_table(void)
 
   for(u8 i=0; i<= 0b1; i++)
   {
-    decoders[0b11110010 | i] = _decode_repete;
+    decoders[0b11110010 | i] = _decode_repeate;
   }
+
+  decoders[0b11110000] = _decode_lock;
+
+  decoders[0b11001101] = _decode_int_type_specified;
+  decoders[0b11001100] = _decode_int3;
+  decoders[0b11001110] = _decode_into;
+  decoders[0b11001111] = _decode_iret;
+
+  decoders[0b11111000] = _decode_clc;
+  decoders[0b11110101] = _decode_cmc;
+  decoders[0b11111001] = _decode_stc;
+  decoders[0b11111100] = _decode_cld;
+  decoders[0b11111101] = _decode_std;
+  decoders[0b11111010] = _decode_cli;
+  decoders[0b11111011] = _decode_sti;
+  decoders[0b11110100] = _decode_hlt;
+  decoders[0b10011011] = _decode_wait;
 
   decoders[0b11111110] = _decode_inc_dec_reg_mem;
 
@@ -1656,6 +1735,7 @@ void InstructionPrint(const Instruction& instr, FILE* out_f)
     case Opcode::OpAnd: fprintf(out_f, "and"); break;
     case Opcode::OpOr: fprintf(out_f, "or"); break;
     case Opcode::OpXor: fprintf(out_f, "xor"); break;
+    case Opcode::OpInt: fprintf(out_f, "int");break;
 
     case Opcode::INVALID: 
       fprintf(out_f, "INVALID OP");

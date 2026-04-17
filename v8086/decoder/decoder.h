@@ -80,6 +80,18 @@
   X(lodsw)\
   X(stosw)\
   X(ret)\
+  X(into)\
+  X(iret)\
+  X(int3)\
+  X(clc)\
+  X(cmc)\
+  X(stc)\
+  X(cld)\
+  X(std)\
+  X(cli)\
+  X(sti)\
+  X(hlt)\
+  X(wait)\
 
 enum class Opcode
 {
@@ -88,6 +100,7 @@ enum class Opcode
   OpAnd,
   OpOr,
   OpXor,
+  OpInt,
 #define X(OP) OP,
   OPS
 #undef X
@@ -95,6 +108,7 @@ enum class Opcode
 
 #define PREFIXES \
   X(rep)\
+  X(lock)\
 
 enum class Prefix
 {
