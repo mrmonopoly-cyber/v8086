@@ -13,13 +13,22 @@ enum ModField{
   RegMode   =  0b11,
 };
 
+enum class RepArgOp
+{
+  movsb = 0b10100100, movsw = 0b10100101,
+  cmpsb = 0b10100110, cmpsw = 0b10100111,
+  scasb = 0b10101110, scasw = 0b10101111,
+  lodsb = 0b10101100, lodsw = 0b10101101,
+  stosb = 0b10101010, stosw = 0b10101011,
+};
+
 typedef u32 (*f_instruction_decoder)(
     const u8 first_byte,
     const u8* const mem,
     const u32 size,
     Instruction* out);
 
-static Register regs_dec[][2]
+static Register regs_dec[][2] =
 {
   {al, ax},
   {cl, cx},
@@ -1167,6 +1176,45 @@ bad:
   return res;
 }
 
+static u32 _decode_repete(
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)
+{
+  u8 res=1;
+  u8 snd_byte;
+  RepArgOp op;
+
+  UNUSED(first_byte);
+
+  out->prefix = Prefix::rep;
+
+  if( size < 1 ) goto bad;
+  snd_byte = mem[0];
+  res++;
+
+  op = (RepArgOp) snd_byte;
+
+  switch (op)
+  {
+    case RepArgOp::movsb: out->op = Opcode::movsb; break;
+    case RepArgOp::movsw: out->op = Opcode::movsw; break;
+    case RepArgOp::cmpsb: out->op = Opcode::cmpsb; break;
+    case RepArgOp::cmpsw: out->op = Opcode::cmpsw; break;
+    case RepArgOp::scasb: out->op = Opcode::scasb; break;
+    case RepArgOp::scasw: out->op = Opcode::scasw; break;
+    case RepArgOp::lodsb: out->op = Opcode::lodsb; break;
+    case RepArgOp::lodsw: out->op = Opcode::lodsw; break;
+    case RepArgOp::stosb: out->op = Opcode::stosb; break;
+    case RepArgOp::stosw: out->op = Opcode::stosw; break;
+  }
+
+  return res;
+
+bad:
+  res =0;
+  out->op = Opcode::INVALID;
+  return res;
+}
+
 #define TEMPLATE_LXX_TO_REG(opcode)                                     \
 static u32 _decode_##opcode##_to_reg(                                   \
     const u8 first_byte, const u8* mem, u32 size, Instruction* out)     \
@@ -1455,6 +1503,11 @@ static void _init_decoders_table(void)
     decoders[0b11010000 | i] = _decode_logic_shift_rotate;
   }
 
+  for(u8 i=0; i<= 0b1; i++)
+  {
+    decoders[0b11110010 | i] = _decode_repete;
+  }
+
   decoders[0b11111110] = _decode_inc_dec_reg_mem;
 
   decoders[0b11111111] = _decode_indirect_intersegment;
@@ -1550,6 +1603,15 @@ void InstructionPrint(const Instruction& instr, FILE* out_f)
 {
   assert(out_f);
   const Displacement* disp = nullptr;
+
+  switch (instr.prefix)
+  {
+#define X(prefix) case Prefix::prefix:  fprintf(out_f, #prefix" "); break;
+    PREFIXES
+#undef X
+  case Prefix::None:
+    break;
+  }
 
   switch (instr.op)
   {

@@ -69,6 +69,16 @@
   X(shr)\
   X(sar)\
   X(test)\
+  X(movsb)\
+  X(cmpsb)\
+  X(scasb)\
+  X(lodsb)\
+  X(stosb)\
+  X(movsw)\
+  X(cmpsw)\
+  X(scasw)\
+  X(lodsw)\
+  X(stosw)\
 
 enum class Opcode
 {
@@ -79,6 +89,17 @@ enum class Opcode
   OpXor,
 #define X(OP) OP,
   OPS
+#undef X
+};
+
+#define PREFIXES \
+  X(rep)\
+
+enum class Prefix
+{
+  None,
+#define X(pr) pr,
+  PREFIXES
 #undef X
 };
 
@@ -98,7 +119,7 @@ enum class Opcode
   X(dh)\
   X(si)\
   X(bh)\
-  X(di)
+  X(di)\
 
 enum Register : u16
 {
@@ -177,6 +198,7 @@ struct Arg{
 };
 
 struct Instruction{
+  Prefix prefix;
   Opcode op;
   Arg args[2];
 };
