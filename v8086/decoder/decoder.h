@@ -51,13 +51,35 @@
   X(aaa)\
   X(daa)\
   X(neg)\
+  X(aas)\
+  X(das)\
+  X(mul)\
+  X(imul)\
+  X(div)\
+  X(idiv)\
+  X(aam)\
+  X(aad)\
+  X(cbw)\
+  X(cwd)\
+  X(rol)\
+  X(ror)\
+  X(rcl)\
+  X(rcr)\
+  X(shl)\
+  X(shr)\
+  X(sar)\
+  X(test)\
 
-enum Opcode
+enum class Opcode
 {
+  INVALID,
+  OpNot,
+  OpAnd,
+  OpOr,
+  OpXor,
 #define X(OP) OP,
   OPS
 #undef X
-  INVALID
 };
 
 #define REGS\
@@ -107,11 +129,17 @@ enum ArgType
   ArgSegment,
 };
 
+struct MemAddr{
+  u32 addr;
+  u8 word;
+};
+
 enum DispType
 {
   Disp8,
   Disp16,
 };
+
 
 struct Displacement{
   DispType t;
@@ -138,7 +166,7 @@ struct Arg{
   union{
     Register reg;
     Segment seg;
-    u32 addr;
+    MemAddr addr;
     u8 uimm8;
     u16 uimm16;
     s8 imm8;
