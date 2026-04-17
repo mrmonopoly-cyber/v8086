@@ -75,7 +75,7 @@ static inline u8 _get_rm_field(const u8 byte)
   return (byte >> 0) & 0x7;
 }
 
-static inline s8 _mod_rm_to_arg(const u8* mem, u8 size, ModField mod, u8 rm, u8 w, Arg* out)
+static inline s8 _mod_rm_to_arg(const u8* mem, u32 size, ModField mod, u8 rm, u8 w, Arg* out)
 {
   s8 res = mod;
 
@@ -200,7 +200,7 @@ bad:
   return res;
 }
 
-static s8 _reg_mem_to_either(const u8 *mem, u8 size, const u8 w, const u8 d, Instruction* out)
+static s8 _reg_mem_to_either(const u8 *mem, u32 size, const u8 w, const u8 d, Instruction* out)
 {
   s8 res=0;
   u8 snd_byte;
@@ -245,7 +245,7 @@ bad:
   return res;
 }
 
-static inline s8 _imm_to_arg(const u8* mem, const u8 size, u8 w, Arg* out)
+static inline s8 _imm_to_arg(const u8* mem, const u32 size, u8 w, Arg* out)
 {
   s8 res=-1;
 
@@ -271,12 +271,12 @@ static inline void _acc_to_arg(const u8 w, Arg* out)
   out->reg = w ? ax : al;
 }
 
-static inline s8 _addr_to_arg(const u8* mem, const u8 size, const u8 w, Arg* out)
+static inline s8 _addr_to_arg(const u8* mem, const u32 size, const u8 w, Arg* out)
 {
   s8 res=0;
   out->t = ArgMem;
 
-  if(size < (1<<w))  goto bad;
+  if(size < (1u<<w))  goto bad;
   res+= (1<<w);
 
   out->addr = w ? (mem[1] << 8) +  mem[0] : mem[0];
@@ -290,7 +290,7 @@ bad:
 
 static s8 _imm_to_reg_mem(
     const u8* mem,
-    const u8 size,
+    const u32 size,
     const u8 s,
     const u8 w,
     Instruction* out,
@@ -356,7 +356,7 @@ bad:
   return res;
 }
 
-static s8 _imm_to_acc(const u8* mem, const u8 size, const u8 w, Instruction* out)
+static s8 _imm_to_acc(const u8* mem, const u32 size, const u8 w, Instruction* out)
 {
   s8 res=0;
   s8 written;
