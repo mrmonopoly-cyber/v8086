@@ -79,6 +79,7 @@
   X(scasw)\
   X(lodsw)\
   X(stosw)\
+  X(ret)\
 
 enum class Opcode
 {

@@ -738,6 +738,7 @@ static u32 _decode_indirect_intersegment(
   ModField mod;
   u8 specialization;
   u8 rm;
+  u8 w=0;
 
   UNUSED(first_byte);
 
@@ -762,16 +763,20 @@ static u32 _decode_indirect_intersegment(
       out->op = Opcode::push;
       break;
     case 0b010:
-      out->op = Opcode::call;
+      out->op = Opcode::call; //INFO: within segment
+      w=1;
       break;
     case 0b011:
-      out->op = Opcode::call;
+      out->op = Opcode::call; //INFO: inter segment
+      w=1;
       break;
     case 0b100:
       out->op = Opcode::jmp;
+      w=1;
       break;
     case 0b101:
       out->op = Opcode::jmp;
+      w=1;
       break;
     default:
       fprintf(stderr, "op: %d\n", specialization);
@@ -779,7 +784,7 @@ static u32 _decode_indirect_intersegment(
 
   }
 
-  written = _mod_rm_to_arg(mem + res, size - res, mod, rm, 0, &out->args[0]);
+  written = _mod_rm_to_arg(mem + res, size - res, mod, rm, w, &out->args[0]);
   if(written < 0) goto bad;
   res+=written;
 
@@ -1041,6 +1046,30 @@ TEMPLATE_DECODE_ONLY_FIRST_BYTE(aas)
 TEMPLATE_DECODE_ONLY_FIRST_BYTE(das)
 TEMPLATE_DECODE_ONLY_FIRST_BYTE(cbw);
 TEMPLATE_DECODE_ONLY_FIRST_BYTE(cwd);
+TEMPLATE_DECODE_ONLY_FIRST_BYTE(ret);
+
+static u32 _decode_ret_XX_seg_add_imm_to_sp(
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)
+{
+  u8 res=1;
+
+  UNUSED(first_byte);
+
+  if( size < 2 ) goto bad;
+  res+=2;
+
+  out->op = Opcode::ret;
+
+  out->args[0].t = ArgImm16;
+  out->args[0].imm16 =  (mem[1] << 8) + mem[0];
+
+  return res;
+
+bad:
+  res =0;
+  out->op = Opcode::INVALID;
+  return res;
+}
 
 static u32 _decode_aam(
     const u8 first_byte, const u8* mem, u32 size, Instruction* out)
@@ -1502,6 +1531,11 @@ static void _init_decoders_table(void)
   {
     decoders[0b11010000 | i] = _decode_logic_shift_rotate;
   }
+
+  decoders[0b11000011] = _decode_ret; //INFO: within segment
+  decoders[0b11001011] = _decode_ret; //INFO: inter segment
+  decoders[0b11000010] = _decode_ret_XX_seg_add_imm_to_sp; //INFO: within segment
+  decoders[0b11001010] = _decode_ret_XX_seg_add_imm_to_sp; //INFO: inter segment
 
   for(u8 i=0; i<= 0b1; i++)
   {
