@@ -84,7 +84,7 @@ static inline u8 _get_rm_field(const u8 byte)
   return (byte >> 0) & 0x7;
 }
 
-static inline s8 _mod_rm_to_arg(const u8* mem, u32 size, ModField mod, u8 rm, u8 w, Arg* out)
+static inline s8 _mod_rm_to_arg(const u8* mem, u32 size, ModField mod, u8 rm, u8 w, Arg* out, u8 far=0)
 {
   s8 res = mod;
 
@@ -151,12 +151,14 @@ static inline s8 _mod_rm_to_arg(const u8* mem, u32 size, ModField mod, u8 rm, u8
       {
         out->t = ArgMemRegRegDisp;
         out->reg_reg_disp.disp.word = w;
+        out->reg_reg_disp.disp.far = far;
         res=0;
       }
       else
       {
         out->t = ArgMemRegDisp;
         out->reg_disp.disp.word = w;
+        out->reg_disp.disp.far = far;
         res=0;
       }
       break;
@@ -169,6 +171,7 @@ static inline s8 _mod_rm_to_arg(const u8* mem, u32 size, ModField mod, u8 rm, u8
         out->reg_reg_disp.disp.t = Disp8;
         out->reg_reg_disp.disp.disp8 = mem[0];
         out->reg_reg_disp.disp.word = w;
+        out->reg_reg_disp.disp.far = far;
       }
       else
       {
@@ -176,6 +179,7 @@ static inline s8 _mod_rm_to_arg(const u8* mem, u32 size, ModField mod, u8 rm, u8
         out->reg_disp.disp.t = Disp8;
         out->reg_disp.disp.disp16 = mem[0];
         out->reg_disp.disp.word = w;
+        out->reg_disp.disp.far = far;
       }
       break;
     case MemMode16:
@@ -187,6 +191,7 @@ static inline s8 _mod_rm_to_arg(const u8* mem, u32 size, ModField mod, u8 rm, u8
         out->reg_reg_disp.disp.t = Disp16;
         out->reg_reg_disp.disp.disp16 = (mem[1] << 8) + mem[0];
         out->reg_reg_disp.disp.word = w;
+        out->reg_reg_disp.disp.far = far;
       }
       else
       {
@@ -194,6 +199,7 @@ static inline s8 _mod_rm_to_arg(const u8* mem, u32 size, ModField mod, u8 rm, u8
         out->reg_disp.disp.t = Disp16;
         out->reg_disp.disp.disp16 = (mem[1] << 8) + mem[0];
         out->reg_disp.disp.word = w;
+        out->reg_disp.disp.far = far;
       }
       break;
     case RegMode:
@@ -495,6 +501,77 @@ bad:
   return res;
 }
 
+static u32 _decode_mov_reg_mem_to_seg_reg(
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)
+{
+  u32 res=1;
+  ModField mod;
+  u8 rm;
+  u8 snd_byte;
+  s8 written;
+
+  UNUSED(first_byte);
+
+  if(size < 1)goto bad;
+  snd_byte = mem[0];
+  res++;
+
+  out->op = Opcode::mov;
+
+  mod = _get_mod_field(snd_byte);
+  rm = _get_rm_field(snd_byte);
+
+  written = _mod_rm_to_arg(mem + 1, size -1, mod, rm, 1, &out->args[0]);
+  if(written < 0) goto bad;
+  res+=written;
+
+  out->args[1].t = ArgSegment;
+  out->args[1].seg = (Segment) ((snd_byte >> 3) & 0x3);
+
+
+  return res;
+
+bad:
+  res =0;
+  out->op = Opcode::INVALID;
+  return res;
+}
+
+static u32 _decode_mov_seg_reg_to_reg_mem(
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)
+{
+  u32 res=1;
+  ModField mod;
+  u8 rm;
+  u8 snd_byte;
+  s8 written;
+
+  UNUSED(first_byte);
+
+  if(size < 1)goto bad;
+  snd_byte = mem[0];
+  res++;
+
+  out->op = Opcode::mov;
+
+  out->args[0].t = ArgSegment;
+  out->args[0].seg = (Segment) ((snd_byte >> 3) & 0x3);
+
+  mod = _get_mod_field(snd_byte);
+  rm = _get_rm_field(snd_byte);
+
+  written = _mod_rm_to_arg(mem + 1, size -1, mod, rm, 1, &out->args[1]);
+  if(written < 0) goto bad;
+  res+=written;
+
+  return res;
+
+bad:
+  res =0;
+  out->op = Opcode::INVALID;
+  return res;
+}
+
 #define DECODE_REG_MEM_TO_EITHER(opcode)                                        \
 static u32 _decode_##opcode##_reg_mem_to_from_reg(                              \
     const u8 first_byte, const u8* mem, const u32 size, Instruction* out)       \
@@ -739,6 +816,7 @@ static u32 _decode_indirect_intersegment(
   u8 specialization;
   u8 rm;
   u8 w=0;
+  u8 far=0;
 
   UNUSED(first_byte);
 
@@ -769,14 +847,16 @@ static u32 _decode_indirect_intersegment(
     case 0b011:
       out->op = Opcode::call; //INFO: inter segment
       w=1;
+      far=1;
       break;
     case 0b100:
-      out->op = Opcode::jmp;
+      out->op = Opcode::jmp;  //INFO: within segment
       w=1;
       break;
     case 0b101:
-      out->op = Opcode::jmp;
+      out->op = Opcode::jmp; //INFO: inter segment
       w=1;
+      far=1;
       break;
     default:
       fprintf(stderr, "op: %d\n", specialization);
@@ -784,7 +864,7 @@ static u32 _decode_indirect_intersegment(
 
   }
 
-  written = _mod_rm_to_arg(mem + res, size - res, mod, rm, w, &out->args[0]);
+  written = _mod_rm_to_arg(mem + res, size - res, mod, rm, w, &out->args[0], far);
   if(written < 0) goto bad;
   res+=written;
 
@@ -1047,6 +1127,7 @@ TEMPLATE_DECODE_ONLY_FIRST_BYTE(das)
 TEMPLATE_DECODE_ONLY_FIRST_BYTE(cbw);
 TEMPLATE_DECODE_ONLY_FIRST_BYTE(cwd);
 TEMPLATE_DECODE_ONLY_FIRST_BYTE(ret);
+TEMPLATE_DECODE_ONLY_FIRST_BYTE(retf);
 TEMPLATE_DECODE_ONLY_FIRST_BYTE(int3);
 TEMPLATE_DECODE_ONLY_FIRST_BYTE(into);
 TEMPLATE_DECODE_ONLY_FIRST_BYTE(iret);
@@ -1094,6 +1175,29 @@ static u32 _decode_ret_XX_seg_add_imm_to_sp(
   res+=2;
 
   out->op = Opcode::ret;
+
+  out->args[0].t = ArgImm16;
+  out->args[0].imm16 =  (mem[1] << 8) + mem[0];
+
+  return res;
+
+bad:
+  res =0;
+  out->op = Opcode::INVALID;
+  return res;
+}
+
+static u32 _decode_retf_XX_seg_add_imm_to_sp(
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)
+{
+  u8 res=1;
+
+  UNUSED(first_byte);
+
+  if( size < 2 ) goto bad;
+  res+=2;
+
+  out->op = Opcode::retf;
 
   out->args[0].t = ArgImm16;
   out->args[0].imm16 =  (mem[1] << 8) + mem[0];
@@ -1240,6 +1344,68 @@ bad:
   return res;
 }
 
+#define TEMPLATE_DIR_INTER_SEG(opcode)                                  \
+static u32 _decode_##opcode##_direct_intersegment(                      \
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)     \
+{                                                                       \
+  u8 res=1;                                                             \
+  UNUSED(first_byte);                                                   \
+  if(size < 4) goto bad;                                                \
+  out->op = Opcode::opcode;                                             \
+  out->args[0].t = ArgDirInterSeg;                                      \
+  out->args[0].dir_inter_seg.addr[0] = (mem[3] << 8) + mem[2];          \
+  out->args[0].dir_inter_seg.addr[1] = (mem[1] << 8) + mem[0];          \
+  res+=4;                                                               \
+  return res;                                                           \
+bad:                                                                    \
+  res =0;                                                               \
+  out->op = Opcode::INVALID;                                            \
+  return res;                                                           \
+}
+
+#define TEMPLATE_DIR_INTER_SEG_SHORT(opcode)                            \
+static u32 _decode_##opcode##_direct_intersegment_short(                \
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)     \
+{                                                                       \
+  u8 res=1;                                                             \
+  UNUSED(first_byte);                                                   \
+  if(size < 1) goto bad;                                                \
+  out->op = Opcode::opcode;                                             \
+  out->args[0].t = ArgIpInc8;                                           \
+  out->args[0].ip_inc_8 = mem[0];                                       \
+  res++;                                                                \
+  return res;                                                           \
+bad:                                                                    \
+  res =0;                                                               \
+  out->op = Opcode::INVALID;                                            \
+  return res;                                                           \
+}
+
+TEMPLATE_DIR_INTER_SEG(call);
+TEMPLATE_DIR_INTER_SEG(jmp);
+TEMPLATE_DIR_INTER_SEG_SHORT(jmp);
+
+#define TEMPLATE_DIR_WITHIN_SEG(opcode)                                 \
+static u32 _decode_##opcode##_direct_withinseg(                         \
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)     \
+{                                                                       \
+  u8 res=1;                                                             \
+  UNUSED(first_byte);                                                   \
+  if(size < 2) goto bad;                                                \
+  out->op = Opcode::opcode;                                             \
+  out->args[0].t = ArgIpInc16;                                          \
+  out->args[0].ip_inc_16 = (mem[1] << 8) + mem[0];                      \
+  res+=2;                                                               \
+  return res;                                                           \
+bad:                                                                    \
+  res =0;                                                               \
+  out->op = Opcode::INVALID;                                            \
+  return res;                                                           \
+}
+
+TEMPLATE_DIR_WITHIN_SEG(jmp);
+TEMPLATE_DIR_WITHIN_SEG(call);
+
 static u32 _decode_repeate(
     const u8 first_byte, const u8* mem, u32 size, Instruction* out)
 {
@@ -1300,6 +1466,30 @@ static u32 _decode_lock(
 
   return res;
 
+bad:
+  res =0;
+  out->op = Opcode::INVALID;
+  return res;
+}
+
+static u32 _decode_seg_prefix(
+    const u8 first_byte, const u8* mem, u32 size, Instruction* out)
+{
+  u8 res=1;
+  s8 written;
+  u8 snd_byte;
+  const Segment seg = (Segment)((first_byte >> 3) & 0x3);
+
+  out->seg = seg;
+
+  if(size < 1) goto bad;
+  snd_byte = mem[0];
+
+  written = decoders[snd_byte](snd_byte, mem + 1, size -1, out);
+  if(written <= 0) goto bad;
+  res+=written;
+
+  return res;
 bad:
   res =0;
   out->op = Opcode::INVALID;
@@ -1382,6 +1572,9 @@ static void _init_decoders_table(void)
   {
     decoders[0b10100010 + i] = _decode_mov_acc_to_mem;
   }
+
+  decoders[0b10001110] = _decode_mov_reg_mem_to_seg_reg;
+  decoders[0b10001100] = _decode_mov_seg_reg_to_reg_mem;
 
   for(u8 i=0; i<= 0b11; i++)
   {
@@ -1594,10 +1787,10 @@ static void _init_decoders_table(void)
     decoders[0b11010000 | i] = _decode_logic_shift_rotate;
   }
 
-  decoders[0b11000011] = _decode_ret; //INFO: within segment
-  decoders[0b11001011] = _decode_ret; //INFO: inter segment
-  decoders[0b11000010] = _decode_ret_XX_seg_add_imm_to_sp; //INFO: within segment
-  decoders[0b11001010] = _decode_ret_XX_seg_add_imm_to_sp; //INFO: inter segment
+  decoders[0b11000011] = _decode_ret;
+  decoders[0b11001011] = _decode_retf;
+  decoders[0b11000010] = _decode_ret_XX_seg_add_imm_to_sp;
+  decoders[0b11001010] = _decode_retf_XX_seg_add_imm_to_sp;
 
   for(u8 i=0; i<= 0b1; i++)
   {
@@ -1605,6 +1798,10 @@ static void _init_decoders_table(void)
   }
 
   decoders[0b11110000] = _decode_lock;
+  for(u8 i=0; i<= 0b11; i++)
+  {
+    decoders[0b00100110 | (i << 3)] = _decode_seg_prefix;
+  }
 
   decoders[0b11001101] = _decode_int_type_specified;
   decoders[0b11001100] = _decode_int3;
@@ -1620,6 +1817,14 @@ static void _init_decoders_table(void)
   decoders[0b11111011] = _decode_sti;
   decoders[0b11110100] = _decode_hlt;
   decoders[0b10011011] = _decode_wait;
+
+  decoders[0b10001100] = _decode_mov_reg_mem_to_seg_reg;
+
+  decoders[0b10011010] =  _decode_call_direct_intersegment;
+  decoders[0b11101010] =  _decode_jmp_direct_intersegment;
+  decoders[0b11101011] =  _decode_jmp_direct_intersegment_short;
+  decoders[0b11101000] =  _decode_call_direct_withinseg;
+  decoders[0b11101001] =  _decode_jmp_direct_withinseg;
 
   decoders[0b11111110] = _decode_inc_dec_reg_mem;
 
@@ -1651,7 +1856,30 @@ static void _print_disp(const Displacement* disp, FILE *out)
   }
 }
 
-static void _print_arg(const Arg* const arg, FILE* out)
+static void _print_seg(const Segment seg, FILE* out)
+{
+  switch (seg)
+  {
+    case ES:
+      fprintf(out, "es:");
+      break;
+    case CS:
+      fprintf(out, "cs:");
+      break;
+    case SS:
+      fprintf(out, "ss:");
+      break;
+    case DS:
+      fprintf(out, "ds:");
+      break;
+    case SegNone:
+      break;
+    case __Num_Segment:
+      break;
+    }
+}
+
+static void _print_arg(const Arg* const arg, FILE* out, const Segment seg)
 {
   switch (arg->t)
   {
@@ -1659,6 +1887,7 @@ static void _print_arg(const Arg* const arg, FILE* out)
       _print_reg(arg->reg, out);
       break;
     case ArgMem:
+      _print_seg(seg, out);
       fprintf(out, "[%d]", arg->addr.addr);
       break;
     case ArgImm8:
@@ -1674,6 +1903,7 @@ static void _print_arg(const Arg* const arg, FILE* out)
       fprintf(out, "%d", arg->uimm16);
       break;
     case ArgMemRegDisp:
+      _print_seg(seg, out);
       fprintf(out, "[");
       _print_reg(arg->reg_disp.r1, out);
       _print_disp(&arg->reg_disp.disp, out);
@@ -1681,6 +1911,7 @@ static void _print_arg(const Arg* const arg, FILE* out)
 
       break;
     case ArgMemRegRegDisp:
+      _print_seg(seg, out);
       fprintf(out, "[");
       _print_reg(arg->reg_reg_disp.r1, out);
       fprintf(out, "+");
@@ -1690,7 +1921,8 @@ static void _print_arg(const Arg* const arg, FILE* out)
       break;
 
     case ArgSegment:
-      switch (arg->seg) {
+      switch (arg->seg)
+      {
         case ES:
           fprintf(out, "es");
           break;
@@ -1703,11 +1935,27 @@ static void _print_arg(const Arg* const arg, FILE* out)
         case DS:
           fprintf(out, "ds");
           break;
-      }
+        case SegNone:
+          assert(0 && "unreachable _print_arg arg segment None");
+          break;
+        case __Num_Segment:
+          assert(0 && "unreachable _print_arg arg segment __Num_Segment");
+          break;
+        }
+      break;
+
+    case ArgDirInterSeg:
+      fprintf(out, "%u:%u\n", arg->dir_inter_seg.addr[0], arg->dir_inter_seg.addr[1]);
+      break;
+
+    case ArgIpInc8:
+      fprintf(out, "%+d", arg->ip_inc_8);
+      break;
+    case ArgIpInc16:
+      fprintf(out, "%+d", arg->ip_inc_16);
       break;
 
     case ArgInvalid:
-      break;
       break;
     }
 }
@@ -1716,6 +1964,7 @@ void InstructionPrint(const Instruction& instr, FILE* out_f)
 {
   assert(out_f);
   const Displacement* disp = nullptr;
+  u8 far=0;
 
   switch (instr.prefix)
   {
@@ -1747,10 +1996,17 @@ void InstructionPrint(const Instruction& instr, FILE* out_f)
   if(instr.args[0].t == ArgMemRegDisp)
   {
     disp = &instr.args[0].reg_disp.disp;
+    far = instr.args[0].reg_disp.disp.far;
   }
   else if(instr.args[0].t == ArgMemRegRegDisp)
   {
     disp = &instr.args[0].reg_reg_disp.disp;
+    far = instr.args[0].reg_reg_disp.disp.far;
+  }
+
+  if(far)
+  {
+    fprintf(out_f, "far ");
   }
 
   if(disp)
@@ -1777,11 +2033,11 @@ void InstructionPrint(const Instruction& instr, FILE* out_f)
   }
 
 
-  _print_arg(&instr.args[0], out_f);
+  _print_arg(&instr.args[0], out_f, instr.seg);
   if(instr.args[1].t)
   {
     fprintf(out_f, ", ");
-    _print_arg(&instr.args[1], out_f);
+    _print_arg(&instr.args[1], out_f,  instr.seg);
   }
   fprintf(out_f, "\n");
 }
@@ -1793,6 +2049,7 @@ u32 InstructionDecode(const u8* mem, const u32 mem_size, Instruction* const out)
   f_instruction_decoder decoder;
 
   memset(out, 0, sizeof(*out));
+  out->seg = SegNone;
 
   if(mem_size < 1) return res;
 

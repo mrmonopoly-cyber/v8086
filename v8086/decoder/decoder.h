@@ -80,6 +80,7 @@
   X(lodsw)\
   X(stosw)\
   X(ret)\
+  X(retf)\
   X(into)\
   X(iret)\
   X(int3)\
@@ -145,10 +146,13 @@ enum Register : u16
 };
 
 enum Segment{
+  SegNone = -1,
   ES = 0b00,
   CS = 0b01,
   SS = 0b10,
   DS = 0b11,
+
+  __Num_Segment,
 };
 
 enum ArgType
@@ -163,6 +167,9 @@ enum ArgType
   ArgMemRegDisp,
   ArgMemRegRegDisp,
   ArgSegment,
+  ArgDirInterSeg,
+  ArgIpInc8,
+  ArgIpInc16,
 };
 
 struct MemAddr{
@@ -176,7 +183,6 @@ enum DispType
   Disp16,
 };
 
-
 struct Displacement{
   DispType t;
   union{
@@ -184,6 +190,7 @@ struct Displacement{
     s16 disp16;
   };
   u8 word;
+  u8 far;
 };
 
 struct RegDisp{
@@ -195,6 +202,10 @@ struct RegRegDisp{
   Register r1;
   Register r2;
   Displacement disp;
+};
+
+struct DirectIntersegmen{
+  u16 addr[2];
 };
 
 struct Arg{
@@ -209,11 +220,15 @@ struct Arg{
     s16 imm16;
     RegDisp reg_disp;
     RegRegDisp reg_reg_disp;
+    DirectIntersegmen dir_inter_seg;
+    s8 ip_inc_8;
+    s16 ip_inc_16;
   };
 };
 
 struct Instruction{
   Prefix prefix;
+  Segment seg;
   Opcode op;
   Arg args[2];
 };
