@@ -1,11 +1,8 @@
 #pragma once
 
-#include <string.h>
-
 #include <v8086_definitions.h>
 
 #include "memory/memory.h"
-#include "decoder/decoder.h"
 
 #define MAX_NUM_OF_PROGRAMS 32
 
@@ -18,31 +15,20 @@ struct ProgramOptInfo{
   u32 es_size = 64 * (1 << PowKilo);
 };
 
-enum ProgSegments
-{
-  ProgCS=0,
-  ProgSS,
-  ProgDS,
-  ProgES,
-
-  __ProgSegments_Count
-};
-
-
 struct ProgramSegment{
   LogicalSegment log_seg;
   u16 written;
 };
 
-struct Program
-{
-  ProgramSegment segment[__ProgSegments_Count];
+struct Program{
+  ProgramSegment segment[__Num_Segment];
   u32 decoding_index;
 };
 
 struct v8086
 {
   PhyMemory memory;
+  CPU cpu;
   Program running[MAX_NUM_OF_PROGRAMS];
   u32 next_free=0;
 };
@@ -63,9 +49,10 @@ ProgramID ProgramLoad(v8086& self, const char* file_program_path, const ProgramO
   
 int ProgramDumpNextInstr(v8086& self,const ProgramID prog_id, Instruction* out);
 
+int ProgramRun(v8086& self, ProgramID prog_id);
+
 static inline void v8086Shutdown(v8086& self)
 {
   PhyMemoryFree(self.memory);
-  memset(self.running, 0, sizeof(self.running));
   self.next_free =0;
 }

@@ -1,7 +1,6 @@
 #include "decoder.h"
 
 #include <assert.h>
-#include <string.h>
 #include <stdio.h>
 
 #include <v8086_definitions.h>
@@ -30,14 +29,14 @@ typedef u32 (*f_instruction_decoder)(
 
 static Register regs_dec[][2] =
 {
-  {al, ax},
-  {cl, cx},
-  {dl, dx},
-  {bl, bx},
-  {ah, sp},
-  {ch, bp},
-  {dh, si},
-  {bh, di},
+  {dec_al, dec_ax},
+  {dec_cl, dec_cx},
+  {dec_dl, dec_dx},
+  {dec_bl, dec_bx},
+  {dec_ah, dec_sp},
+  {dec_ch, dec_bp},
+  {dec_dh, dec_si},
+  {dec_bh, dec_di},
 };
 
 static f_instruction_decoder decoders[256];
@@ -91,26 +90,26 @@ static inline s8 _mod_rm_to_arg(const u8* mem, u32 size, ModField mod, u8 rm, u8
   switch (rm)
   {
     case 0b000:
-      out->reg_reg_disp.r1 = bx;
-      out->reg_reg_disp.r2 = si;
+      out->reg_reg_disp.r1 = dec_bx;
+      out->reg_reg_disp.r2 = dec_si;
       break;
     case 0b001:
-      out->reg_reg_disp.r1 = bx;
-      out->reg_reg_disp.r2 = di;
+      out->reg_reg_disp.r1 = dec_bx;
+      out->reg_reg_disp.r2 = dec_di;
       break;
     case 0b010:
-      out->reg_reg_disp.r1 = bp;
-      out->reg_reg_disp.r2 = si;
+      out->reg_reg_disp.r1 = dec_bp;
+      out->reg_reg_disp.r2 = dec_si;
       break;
     case 0b011:
-      out->reg_reg_disp.r1 = bp;
-      out->reg_reg_disp.r2 = di;
+      out->reg_reg_disp.r1 = dec_bp;
+      out->reg_reg_disp.r2 = dec_di;
       break;
     case 0b100:
-      out->reg_disp.r1 = si;
+      out->reg_disp.r1 = dec_si;
       break;
     case 0b101:
-      out->reg_disp.r1 = di;
+      out->reg_disp.r1 = dec_di;
       break;
     case 0b110:
       switch (mod)
@@ -119,10 +118,10 @@ static inline s8 _mod_rm_to_arg(const u8* mem, u32 size, ModField mod, u8 rm, u8
           res = 2;
           break;
         case MemMode8:
-          out->reg_disp.r1 = bp;
+          out->reg_disp.r1 = dec_bp;
           break;
         case MemMode16:
-          out->reg_disp.r1 = bp;
+          out->reg_disp.r1 = dec_bp;
           break;
         case RegMode:
           out->reg = regs_dec[rm][w];
@@ -130,7 +129,7 @@ static inline s8 _mod_rm_to_arg(const u8* mem, u32 size, ModField mod, u8 rm, u8
       }
       break;
     case 0b111:
-      out->reg_disp.r1 = bx;
+      out->reg_disp.r1 = dec_bx;
       break;
     default:
       assert(0 && "unreachable _mod_rm_to_arg: " __FILE__);
@@ -284,7 +283,7 @@ static inline s8 _imm_to_arg(const u8* mem, const u32 size, u8 w, Arg* out)
 static inline void _acc_to_arg(const u8 w, Arg* out)
 {
   out->t = ArgReg;
-  out->reg = w ? ax : al;
+  out->reg = w ? dec_ax : dec_al;
 }
 
 static inline s8 _addr_to_arg(const u8* mem, const u32 size, const u8 w, Arg* out)
@@ -999,7 +998,7 @@ static u32 _decode_xchg_reg_with_acc(
   out->op = Opcode::xchg;
 
   out->args[0].t = ArgReg;
-  out->args[0].reg = ax;
+  out->args[0].reg = dec_ax;
 
   out->args[1].t = ArgReg;
   out->args[1].reg = reg;
@@ -1021,7 +1020,7 @@ static u32 _decode_in_fixed_port(
   res++;
 
   out->args[0].t = ArgReg;
-  out->args[0].reg = w ? ax : al;
+  out->args[0].reg = w ? dec_ax : dec_al;
 
   out->args[1].t = ArgUImm8;
   out->args[1].uimm8 = data;
@@ -1046,10 +1045,10 @@ static u32 _decode_in_variable_port(
   out->op = Opcode::in;
 
   out->args[0].t = ArgReg;
-  out->args[0].reg = w ? ax : al;
+  out->args[0].reg = w ? dec_ax : dec_al;
 
   out->args[1].t = ArgReg;
-  out->args[1].reg = dx;
+  out->args[1].reg = dec_dx;
 
   return res;
 }
@@ -1071,7 +1070,7 @@ static u32 _decode_out_fixed_port(
   out->args[0].uimm8 = data;
 
   out->args[1].t = ArgReg;
-  out->args[1].reg = w ? ax : al;
+  out->args[1].reg = w ? dec_ax : dec_al;
 
 
   return res;
@@ -1094,10 +1093,10 @@ static u32 _decode_out_variable_port(
   out->op = Opcode::out;
 
   out->args[0].t = ArgReg;
-  out->args[0].reg = dx;
+  out->args[0].reg = dec_dx;
 
   out->args[1].t = ArgReg;
-  out->args[1].reg = w ? ax : al;
+  out->args[1].reg = w ? dec_ax : dec_al;
 
 
   return res;
@@ -1333,7 +1332,7 @@ static u32 _decode_logic_shift_rotate(
   else
   {
     out->args[1].t = ArgReg;
-    out->args[1].imm8 = cl;
+    out->args[1].imm8 = dec_cl;
   }
 
   return res;
@@ -1831,224 +1830,13 @@ static void _init_decoders_table(void)
   decoders[0b11111111] = _decode_indirect_intersegment;
 }
 
-static void _print_reg(const Register reg, FILE* out)
-{
-  switch (reg)
-  {
-#define X(r) case r: fprintf(out, #r); break;
-  REGS
-#undef X
-    case INVALID_REG:
-      assert(0 && "unreachable _print_reg: " __FILE__);
-      break;
-  }
-}
-
-static void _print_disp(const Displacement* disp, FILE *out)
-{
-  if(disp->t == Disp8 && disp->disp8)
-  {
-    fprintf(out, "%+d", disp->disp8);
-  }
-  else if(disp->t == Disp16 && disp->disp16)
-  {
-    fprintf(out, "%+d", disp->disp16);
-  }
-}
-
-static void _print_seg(const Segment seg, FILE* out)
-{
-  switch (seg)
-  {
-    case ES:
-      fprintf(out, "es:");
-      break;
-    case CS:
-      fprintf(out, "cs:");
-      break;
-    case SS:
-      fprintf(out, "ss:");
-      break;
-    case DS:
-      fprintf(out, "ds:");
-      break;
-    case SegNone:
-      break;
-    case __Num_Segment:
-      break;
-    }
-}
-
-static void _print_arg(const Arg* const arg, FILE* out, const Segment seg)
-{
-  switch (arg->t)
-  {
-    case ArgReg:
-      _print_reg(arg->reg, out);
-      break;
-    case ArgMem:
-      _print_seg(seg, out);
-      fprintf(out, "[%d]", arg->addr.addr);
-      break;
-    case ArgImm8:
-      fprintf(out, "%d", arg->imm8);
-      break;
-    case ArgImm16:
-      fprintf(out, "%d", arg->imm16);
-      break;
-    case ArgUImm8:
-      fprintf(out, "%d", arg->uimm8);
-      break;
-    case ArgUImm16:
-      fprintf(out, "%d", arg->uimm16);
-      break;
-    case ArgMemRegDisp:
-      _print_seg(seg, out);
-      fprintf(out, "[");
-      _print_reg(arg->reg_disp.r1, out);
-      _print_disp(&arg->reg_disp.disp, out);
-      fprintf(out, "]");
-
-      break;
-    case ArgMemRegRegDisp:
-      _print_seg(seg, out);
-      fprintf(out, "[");
-      _print_reg(arg->reg_reg_disp.r1, out);
-      fprintf(out, "+");
-      _print_reg(arg->reg_reg_disp.r2, out);
-      _print_disp(&arg->reg_reg_disp.disp, out);
-      fprintf(out, "]");
-      break;
-
-    case ArgSegment:
-      switch (arg->seg)
-      {
-        case ES:
-          fprintf(out, "es");
-          break;
-        case SS:
-          fprintf(out, "ss");
-          break;
-        case CS:
-          fprintf(out, "cs");
-          break;
-        case DS:
-          fprintf(out, "ds");
-          break;
-        case SegNone:
-          assert(0 && "unreachable _print_arg arg segment None");
-          break;
-        case __Num_Segment:
-          assert(0 && "unreachable _print_arg arg segment __Num_Segment");
-          break;
-        }
-      break;
-
-    case ArgDirInterSeg:
-      fprintf(out, "%u:%u\n", arg->dir_inter_seg.addr[0], arg->dir_inter_seg.addr[1]);
-      break;
-
-    case ArgIpInc8:
-      fprintf(out, "%+d", arg->ip_inc_8);
-      break;
-    case ArgIpInc16:
-      fprintf(out, "%+d", arg->ip_inc_16);
-      break;
-
-    case ArgInvalid:
-      break;
-    }
-}
-
-void InstructionPrint(const Instruction& instr, FILE* out_f)
-{
-  assert(out_f);
-  const Displacement* disp = nullptr;
-  u8 far=0;
-
-  switch (instr.prefix)
-  {
-#define X(prefix) case Prefix::prefix:  fprintf(out_f, #prefix" "); break;
-    PREFIXES
-#undef X
-  case Prefix::None:
-    break;
-  }
-
-  switch (instr.op)
-  {
-#define X(OP) case Opcode::OP:  fprintf(out_f, #OP); break;
-    OPS
-#undef X
-    case Opcode::OpNot: fprintf(out_f, "not"); break;
-    case Opcode::OpAnd: fprintf(out_f, "and"); break;
-    case Opcode::OpOr: fprintf(out_f, "or"); break;
-    case Opcode::OpXor: fprintf(out_f, "xor"); break;
-    case Opcode::OpInt: fprintf(out_f, "int");break;
-
-    case Opcode::INVALID: 
-      fprintf(out_f, "INVALID OP");
-      break;
-    }
-
-  fprintf(out_f, " ");
-
-  if(instr.args[0].t == ArgMemRegDisp)
-  {
-    disp = &instr.args[0].reg_disp.disp;
-    far = instr.args[0].reg_disp.disp.far;
-  }
-  else if(instr.args[0].t == ArgMemRegRegDisp)
-  {
-    disp = &instr.args[0].reg_reg_disp.disp;
-    far = instr.args[0].reg_reg_disp.disp.far;
-  }
-
-  if(far)
-  {
-    fprintf(out_f, "far ");
-  }
-
-  if(disp)
-  {
-    if(disp->word || instr.op == Opcode::push || instr.op == Opcode::pop)
-    {
-      fprintf(out_f, "word ");
-    }
-    else
-    {
-      fprintf(out_f, "byte ");
-    }
-  }
-  else if(instr.args[0].t == ArgMem)
-  {
-    if(instr.args[0].addr.word || instr.op == Opcode::push || instr.op == Opcode::pop)
-    {
-      fprintf(out_f, "word ");
-    }
-    else
-    {
-      fprintf(out_f, "byte ");
-    }
-  }
-
-
-  _print_arg(&instr.args[0], out_f, instr.seg);
-  if(instr.args[1].t)
-  {
-    fprintf(out_f, ", ");
-    _print_arg(&instr.args[1], out_f,  instr.seg);
-  }
-  fprintf(out_f, "\n");
-}
-
 u32 InstructionDecode(const u8* mem, const u32 mem_size, Instruction* const out)
 {
   u32 res = 0;
   u8 opcode;
   f_instruction_decoder decoder;
 
-  memset(out, 0, sizeof(*out));
+  *out = {};
   out->seg = SegNone;
 
   if(mem_size < 1) return res;

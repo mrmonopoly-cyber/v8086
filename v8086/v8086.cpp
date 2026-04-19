@@ -1,5 +1,6 @@
 #include "v8086.h"
 #include "decoder/decoder.h"
+#include "exec/exec.h"
 #include "memory/memory.h"
 #include "memory/physical.h"
 #include "v8086_definitions.h"
@@ -79,12 +80,12 @@ ProgramID ProgramLoad(v8086& self, const char* file_program_path, const ProgramO
   {
     prog = &self.running[res];
 
-    prog->segment[ProgCS] = _seg_init(self.memory, &physical_addr, prog_info.cs_size);
-    prog->segment[ProgSS] = _seg_init(self.memory, &physical_addr, prog_info.ss_size);
-    prog->segment[ProgDS] = _seg_init(self.memory, &physical_addr, prog_info.ds_size);
-    prog->segment[ProgES] = _seg_init(self.memory, &physical_addr, prog_info.es_size);
+    prog->segment[CS] = _seg_init(self.memory, &physical_addr, prog_info.cs_size);
+    prog->segment[SS] = _seg_init(self.memory, &physical_addr, prog_info.ss_size);
+    prog->segment[DS] = _seg_init(self.memory, &physical_addr, prog_info.ds_size);
+    prog->segment[ES] = _seg_init(self.memory, &physical_addr, prog_info.es_size);
 
-    physical_addr = AddrFromSegment(prog->segment[ProgCS].log_seg);
+    physical_addr = AddrFromSegment(prog->segment[CS].log_seg);
     phy_addr = PhyGetAddrAt(self.memory, physical_addr);
 
     program_f = fopen(file_program_path, "rb");
@@ -93,7 +94,7 @@ ProgramID ProgramLoad(v8086& self, const char* file_program_path, const ProgramO
     {
       //FIX: you may write more data than what is available in the segment.
       //Correct from the point of view of 8086 but still dangerous. Keep it?
-      prog->segment[ProgCS].written =fread(phy_addr,1, prog_info.cs_size, program_f);
+      prog->segment[CS].written =fread(phy_addr,1, prog_info.cs_size, program_f);
       fclose(program_f);
     }
     else
@@ -117,15 +118,15 @@ int ProgramDumpNextInstr(v8086& self,const ProgramID prog_id, Instruction* out)
 
   int res=-1;
   Program* prog = &self.running[prog_id];
-  const u32 prog_length = prog->segment[ProgCS].written;
+  const u32 prog_length = prog->segment[CS].written;
   u32 index = prog->decoding_index;
   u32 physical_addr = 0;
   s32 written =0;
   u8* mem_ptr = nullptr;
 
-  if(index < prog->segment[ProgCS].written)
+  if(index < prog->segment[CS].written)
   {
-    physical_addr = AddrFromSegment(prog->segment[ProgCS].log_seg, index);
+    physical_addr = AddrFromSegment(prog->segment[CS].log_seg, index);
     mem_ptr = PhyGetAddrAt(self.memory, physical_addr);
     written = InstructionDecode(mem_ptr, prog_length - index ,out);
 
@@ -140,6 +141,51 @@ int ProgramDumpNextInstr(v8086& self,const ProgramID prog_id, Instruction* out)
       fprintf(stderr, "Mnemonic not recognized: ");
       _print_byte(*mem_ptr, stderr);
       fprintf(stderr, "\n");
+    }
+  }
+
+  return res;
+}
+
+int ProgramRun(v8086& self, ProgramID prog_id)
+{
+  int res=-1;
+  Program* prog = &self.running[prog_id];
+  const u32 prog_length = prog->segment[CS].written;
+  u32 physical_addr = 0;
+  s32 written =0;
+  u8* mem_ptr = nullptr;
+  Instruction instr = {};
+  s32 err=0;
+  u32 index=0;
+
+  while(index < prog->segment[CS].written)
+  {
+    physical_addr = AddrFromSegment(prog->segment[CS].log_seg, index);
+    mem_ptr = PhyGetAddrAt(self.memory, physical_addr);
+    written = InstructionDecode(mem_ptr, prog_length - index, &instr);
+
+    if(written)
+    {
+      res=0;
+      if((err=InstructionExec(&instr, &self.cpu))<0)
+      {
+        fprintf(stderr, "execution error: %d with instr: ", err);
+        InstructionPrint(instr, stderr);
+        fprintf(stderr, "\n");
+        res = err;
+        break;
+      }
+      instr = {};
+      index += written;
+    }
+    else
+    {
+      fprintf(stderr, "Mnemonic not recognized: ");
+      _print_byte(*mem_ptr, stderr);
+      fprintf(stderr, "\n");
+      res = -2;
+      break;
     }
   }
 

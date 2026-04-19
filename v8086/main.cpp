@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
@@ -6,16 +7,25 @@
 
 #include "v8086.h"
 
+enum ExecOptions : uint32_t
+{
+  Decode = 1 << 0,
+  Run = 1 << 1,
+};
+
 struct Inputs{
   FILE* out;
   const char* file_program_path;
+  uint32_t exec_options;
 };
 
 static inline void _help(void)
 {
   printf("usage: v8086 <-h> [bin_file]\n");
-  printf("\t -h \t\t print _help\n");
-  printf("\t -o [file] \t output file name\n");
+  printf("\t -h \t\tprint _help\n");
+  printf("\t -o [file]\toutput file name. If not given stdout is used\n");
+  printf("\t -d \t\tdisassemble the given program and save it on output file\n");
+  printf("\t -r \t\trun the program\n");
 }
 
 static inline Inputs _parse_args(int argc, char **argv)
@@ -47,6 +57,14 @@ static inline Inputs _parse_args(int argc, char **argv)
         fprintf(stderr, "invalid out print: %s\n", strerror(errno));
         exit(2);
       }
+    }
+    else if(!sw.compare("-d"))
+    {
+      res.exec_options |= ExecOptions::Decode;
+    }
+    else if(!sw.compare("-r"))
+    {
+      res.exec_options |= ExecOptions::Run;
     }
     else
     {
@@ -89,10 +107,22 @@ int main(int argc, char *argv[])
     goto end;
   }
 
-  fprintf(input.out, "bits %d\n\n", v8086RegSize(v8086));
-  while(ProgramDumpNextInstr(v8086, pid, &instr) >= 0)
+  if(input.exec_options & ExecOptions::Decode)
   {
-    InstructionPrint(instr, input.out);
+    fprintf(input.out, "bits %d\n\n", v8086RegSize(v8086));
+    while(ProgramDumpNextInstr(v8086, pid, &instr) >= 0)
+    {
+      InstructionPrint(instr, input.out);
+      fprintf(input.out, "\n");
+    }
+  }
+
+  if(input.exec_options & ExecOptions::Run)
+  {
+    if((res=ProgramRun(v8086, pid))<0)
+    {
+      fprintf(stderr, "error running the program: %d\n", res);
+    }
   }
 
 
