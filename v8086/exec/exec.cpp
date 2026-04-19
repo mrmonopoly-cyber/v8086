@@ -5,7 +5,7 @@
 
 #include <assert.h>
 
-typedef s32 (*op_exec)(Instruction* instr, CPU* cpu);
+typedef s32 (*op_exec)(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment]);
 
 static u8 dummy_u8_buffer;
 static op_exec executor [(size_t)Opcode::__Opcode_count];
@@ -94,7 +94,11 @@ static inline u8* _reg_to_ptr(Register reg, CPU* cpu, u8* o_reg_size = &dummy_u8
   return res;
 }
 
-static inline u8* _arg_to_ptr(Arg* arg, CPU* cpu, u8* o_reg_size = &dummy_u8_buffer)
+static inline u8* _arg_to_ptr(
+    Arg* arg,
+    CPU* cpu,
+    SegmentView segments[__Num_Segment],
+    u8* o_reg_size = &dummy_u8_buffer)
 {
   u8* res = nullptr;
 
@@ -132,7 +136,7 @@ static inline u8* _arg_to_ptr(Arg* arg, CPU* cpu, u8* o_reg_size = &dummy_u8_buf
       TODO();
       break;
     case ArgSegment:
-      TODO();
+      res = segments[arg->seg].data;
       break;
     case ArgDirInterSeg:
       TODO();
@@ -150,24 +154,25 @@ static inline u8* _arg_to_ptr(Arg* arg, CPU* cpu, u8* o_reg_size = &dummy_u8_buf
   return res;
 }
 
-static s32 invalid_op_exec(Instruction* instr, CPU* cpu)
+static s32 invalid_op_exec(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment])
 {
   s32 res=-1;
 
   UNUSED(cpu);
   UNUSED(instr);
+  UNUSED(segmens);
 
   return res;
 }
 
-static s32 _exec_mov(Instruction* instr, CPU* cpu)
+static s32 _exec_mov(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment])
 {
   s32 res=0;
   u8* src, *dst;
   u8 byte_to_move = 1;
 
-  dst = _arg_to_ptr(&instr->args[0], cpu, &byte_to_move);
-  src = _arg_to_ptr(&instr->args[1], cpu);
+  dst = _arg_to_ptr(&instr->args[0], cpu, segmens, &byte_to_move);
+  src = _arg_to_ptr(&instr->args[1], cpu, segmens);
 
   memcpy(dst, src, byte_to_move);
 
@@ -185,12 +190,12 @@ static void init_executor_array(void)
   executor[(size_t)Opcode::mov] = _exec_mov;
 }
 
-s32 InstructionExec(Instruction* const instr, CPU* cpu)
+s32 InstructionExec(Instruction* const instr, CPU* cpu, SegmentView segmens[__Num_Segment])
 {
   s32 res=0;
   op_exec exec = executor[(size_t)instr->op];
 
-  res = exec(instr, cpu);
+  res = exec(instr, cpu, segmens);
 
   return res;
 }

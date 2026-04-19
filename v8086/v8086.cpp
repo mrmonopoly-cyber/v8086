@@ -43,6 +43,17 @@ static ProgramSegment _seg_init(PhyMemory& mem, u32 *physical_addr, const u32 si
   return res;
 }
 
+static inline void _get_seg_view(v8086* self, ProgramSegment seg, SegmentView* sw)
+{
+  u32 physical_addr;
+  u8* mem_ptr;
+
+  physical_addr = AddrFromSegment(seg.log_seg);
+  mem_ptr = PhyGetAddrAt(self->memory, physical_addr);
+
+  sw->data = mem_ptr;
+  sw->len = seg.written;
+}
 
 ProgramID ProgramLoad(v8086& self, const char* file_program_path, const ProgramOptInfo& prog_info)
 {
@@ -143,6 +154,13 @@ int ProgramRun(v8086& self, ProgramID prog_id)
   Instruction instr = {};
   s32 err=0;
   u32 index=0;
+  SegmentView segs[__Num_Segment];
+
+  _get_seg_view(&self, prog->segment[CS], &segs[CS]);
+  _get_seg_view(&self, prog->segment[SS], &segs[SS]);
+  _get_seg_view(&self, prog->segment[DS], &segs[DS]);
+  _get_seg_view(&self, prog->segment[ES], &segs[ES]);
+
 
   while(index < prog->segment[CS].written)
   {
@@ -153,7 +171,7 @@ int ProgramRun(v8086& self, ProgramID prog_id)
     if(written)
     {
       res=0;
-      if((err=InstructionExec(&instr, &self.cpu))<0)
+      if((err=InstructionExec(&instr, &self.cpu, segs))<0)
       {
         fprintf(stderr, "execution error: %d with instr: ", err);
         InstructionPrint(instr, stderr);
