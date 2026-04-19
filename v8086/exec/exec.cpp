@@ -7,13 +7,12 @@
 
 typedef s32 (*op_exec)(Instruction* instr, CPU* cpu);
 
+static u8 dummy_u8_buffer;
 static op_exec executor [(size_t)Opcode::__Opcode_count];
 
-static inline u8* _reg_to_ptr(Register reg, CPU* cpu, u8* o_reg_size = nullptr)
+static inline u8* _reg_to_ptr(Register reg, CPU* cpu, u8* o_reg_size = &dummy_u8_buffer)
 {
   u8* res = nullptr;
-  u8 o_reg_size_fallback;
-  if(o_reg_size == nullptr) o_reg_size = &o_reg_size_fallback;
 
   switch(reg)
   {
@@ -90,14 +89,14 @@ static inline u8* _reg_to_ptr(Register reg, CPU* cpu, u8* o_reg_size = nullptr)
       break;
   }
 
+  assert(res);
+
   return res;
 }
 
-static inline u8* _arg_to_ptr(Arg* arg, CPU* cpu, u8* o_reg_size = nullptr)
+static inline u8* _arg_to_ptr(Arg* arg, CPU* cpu, u8* o_reg_size = &dummy_u8_buffer)
 {
   u8* res = nullptr;
-  u8 o_reg_size_fallback;
-  if(o_reg_size == nullptr) o_reg_size = &o_reg_size_fallback;
 
   switch (arg->t)
   {
@@ -146,6 +145,17 @@ static inline u8* _arg_to_ptr(Arg* arg, CPU* cpu, u8* o_reg_size = nullptr)
       break;
   }
 
+  assert(res);
+
+  return res;
+}
+
+static s32 invalid_op_exec(Instruction* instr, CPU* cpu)
+{
+  s32 res=-1;
+
+  UNUSED(cpu);
+  UNUSED(instr);
 
   return res;
 }
@@ -160,16 +170,6 @@ static s32 _exec_mov(Instruction* instr, CPU* cpu)
   src = _arg_to_ptr(&instr->args[1], cpu);
 
   memcpy(dst, src, byte_to_move);
-
-  return res;
-}
-
-s32 invalid_op_exec(Instruction* instr, CPU* cpu)
-{
-  s32 res=-1;
-
-  UNUSED(cpu);
-  UNUSED(instr);
 
   return res;
 }
