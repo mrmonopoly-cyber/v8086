@@ -93,97 +93,71 @@ static inline u8* _reg_to_ptr(Register reg, CPU* cpu, u8* o_reg_size = nullptr)
   return res;
 }
 
+static inline u8* _arg_to_ptr(Arg* arg, CPU* cpu, u8* o_reg_size = nullptr)
+{
+  u8* res = nullptr;
+  u8 o_reg_size_fallback;
+  if(o_reg_size == nullptr) o_reg_size = &o_reg_size_fallback;
+
+  switch (arg->t)
+  {
+    case ArgInvalid:
+      TODO();
+      break;
+    case ArgReg:
+      res = _reg_to_ptr(arg->reg, cpu, o_reg_size);
+      break;
+    case ArgMem:
+      TODO();
+      break;
+    case ArgUImm8:
+      res = &arg->uimm8;
+      *o_reg_size = 1;
+      break;
+    case ArgUImm16:
+      res = (u8*) &arg->uimm16;
+      *o_reg_size = 2;
+      break;
+    case ArgImm8:
+      res = (u8*) &arg->imm8;
+      *o_reg_size = 1;
+      break;
+    case ArgImm16:
+      res = (u8*) &arg->imm16;
+      *o_reg_size = 2;
+      break;
+    case ArgMemRegDisp:
+      TODO();
+      break;
+    case ArgMemRegRegDisp:
+      TODO();
+      break;
+    case ArgSegment:
+      TODO();
+      break;
+    case ArgDirInterSeg:
+      TODO();
+      break;
+    case ArgIpInc8:
+      TODO();
+      break;
+    case ArgIpInc16:
+      TODO();
+      break;
+  }
+
+
+  return res;
+}
+
 static s32 _exec_mov(Instruction* instr, CPU* cpu)
 {
   s32 res=0;
   u8* src, *dst;
   u8 byte_to_move = 1;
 
-  switch (instr->args[0].t)
-  {
-    case ArgInvalid:
-      assert(0 && "mov first arg cannot be Invalid in mov");
-      break;
-    case ArgReg:
-      dst = _reg_to_ptr(instr->args[0].reg, cpu, &byte_to_move);
-      break;
-    case ArgMem:
-      TODO();
-      break;
-    case ArgUImm8:
-      assert(0 && "mov first arg cannot be uimm8");
-      break;
-    case ArgUImm16:
-      assert(0 && "mov first arg cannot be uimm16");
-      break;
-    case ArgImm8:
-      assert(0 && "mov first arg cannot be imm8");
-      break;
-    case ArgImm16:
-      assert(0 && "mov first arg cannot be imm16");
-      break;
-    case ArgMemRegDisp:
-      TODO();
-      break;
-    case ArgMemRegRegDisp:
-      TODO();
-      break;
-    case ArgSegment:
-      TODO();
-      break;
-    case ArgDirInterSeg:
-      TODO();
-      break;
-    case ArgIpInc8:
-      assert(0 && "mov first arg cannot be ip inc 8");
-      break;
-    case ArgIpInc16:
-      assert(0 && "mov first arg cannot be ip inc 16");
-      break;
-  }
-
-  switch (instr->args[1].t)
-  {
-    case ArgInvalid:
-      assert(0 && "mov first arg cannot be Invalid in mov");
-      break;
-    case ArgReg:
-      src = _reg_to_ptr(instr->args[0].reg, cpu);
-      break;
-    case ArgMem:
-      TODO();
-      break;
-    case ArgUImm8:
-      src = &instr->args[1].uimm8;
-      break;
-    case ArgUImm16:
-      src = (u8*) &instr->args[1].uimm16;
-      break;
-    case ArgImm8:
-      src = (u8*) &instr->args[1].imm8;
-      break;
-    case ArgImm16:
-      src = (u8*) &instr->args[1].uimm16;
-      break;
-    case ArgMemRegDisp:
-      TODO();
-      break;
-    case ArgMemRegRegDisp:
-      TODO();
-      break;
-    case ArgSegment:
-      TODO();
-      break;
-    case ArgDirInterSeg:
-      TODO();
-      break;
-    case ArgIpInc8:
-      assert(0 && "mov first arg cannot be ip inc 8");
-      break;
-    case ArgIpInc16:
-      assert(0 && "mov first arg cannot be ip inc 16");
-      break;
-  }
+  dst = _arg_to_ptr(&instr->args[0], cpu, &byte_to_move);
+  src = _arg_to_ptr(&instr->args[1], cpu);
 
   memcpy(dst, src, byte_to_move);
 
