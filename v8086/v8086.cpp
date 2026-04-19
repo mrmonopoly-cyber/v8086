@@ -43,21 +43,6 @@ static ProgramSegment _seg_init(PhyMemory& mem, u32 *physical_addr, const u32 si
   return res;
 }
 
-static void _print_byte(u8 byte, FILE* out)
-{
-  fprintf(stderr, "0b");
-  for(u8 i=0; i<8; i++)
-  {
-    if((byte>> (7 - i)) & 0x1)
-    {
-      fprintf(out, "1");
-    }else
-    {
-      fprintf(out, "0");
-    }
-  }
-  fprintf(stderr, " (%d)", byte);
-}
 
 ProgramID ProgramLoad(v8086& self, const char* file_program_path, const ProgramOptInfo& prog_info)
 {
@@ -190,4 +175,9 @@ int ProgramRun(v8086& self, ProgramID prog_id)
   }
 
   return res;
+}
+
+void V8086Dump(v8086& self, FILE* out)
+{
+  CPUPrint(&self.cpu, out);
 }

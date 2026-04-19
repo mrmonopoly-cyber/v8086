@@ -212,3 +212,65 @@ void InstructionPrint(const Instruction& instr, FILE* out_f)
     _print_arg(&instr.args[1], out_f,  instr.seg);
   }
 }
+
+void CPUPrint(CPU* cpu, FILE* out)
+{
+  for(size_t r=0; r<__reg_count; r++)
+  {
+    switch ((FullRegs)r)
+    {
+      case ax:
+        fprintf(out, "ax: ");
+        _print_byte(cpu->regs[r]._u16 , out);
+        fprintf(out, "\tah: ");
+        _print_byte(cpu->regs[r]._half.h, out);
+        fprintf(out, "\tal: ");
+        _print_byte(cpu->regs[r]._half.l, out);
+        break;
+      case bx:
+        fprintf(out, "bx: ");
+        _print_byte(cpu->regs[r]._u16 , out);
+        fprintf(out, "\tbh: ");
+        _print_byte(cpu->regs[r]._half.h, out);
+        fprintf(out, "\tbl: ");
+        _print_byte(cpu->regs[r]._half.l, out);
+        break;
+      case cx:
+        fprintf(out, "cx: ");
+        _print_byte(cpu->regs[r]._u16 , out);
+        fprintf(out, "\tch: ");
+        _print_byte(cpu->regs[r]._half.h, out);
+        fprintf(out, "\tcl: ");
+        _print_byte(cpu->regs[r]._half.l, out);
+        break;
+      case dx:
+        fprintf(out, "dx: ");
+        _print_byte(cpu->regs[r]._u16 , out);
+        fprintf(out, "\tdh: ");
+        _print_byte(cpu->regs[r]._half.h, out);
+        fprintf(out, "\tdl: ");
+        _print_byte(cpu->regs[r]._half.l, out);
+        break;
+      case si:
+        fprintf(out, "si: ");
+        _print_byte(cpu->regs[r]._u16 , out);
+        break;
+      case di:
+        fprintf(out, "di: ");
+        _print_byte(cpu->regs[r]._u16 , out);
+        break;
+      case sp:
+        fprintf(out, "sp: ");
+        _print_byte(cpu->regs[r]._u16 , out);
+        break;
+      case bp:
+        fprintf(out, "bp: ");
+        _print_byte(cpu->regs[r]._u16 , out);
+        break;
+      case __reg_count:
+        assert(0 && "__reg_count not printable");
+        break;
+    }
+    fprintf(out, "\n");
+  }
+}

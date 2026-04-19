@@ -123,6 +123,7 @@ int main(int argc, char *argv[])
     {
       fprintf(stderr, "error running the program: %d\n", res);
     }
+    V8086Dump(v8086, input.out);
   }
 
 

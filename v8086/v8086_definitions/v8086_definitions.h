@@ -256,19 +256,12 @@ struct Instruction{
   Arg args[2];
 };
 
-enum CPURegType{
-  Reg_8_bit,
-  Reg_16_bit,
-  Reg_16_bit_split,
-};
-
 struct SplitReg{
-  u8 h;
   u8 l;
+  u8 h;
 };
 
 struct CPURegister{
-  CPURegType t;
   union{
     u16 _u16;
     SplitReg _half;
@@ -281,10 +274,10 @@ enum FullRegs :size_t
   bx,
   cx,
   dx,
-  si,
-  di,
   sp,
   bp,
+  si,
+  di,
 
   __reg_count
 };
@@ -293,10 +286,30 @@ struct CPU{
   CPURegister regs[__reg_count];
 };
 
-void print_seg(const Segment seg, FILE* out);
-void print_disp(const Displacement* disp, FILE *out);
-void print_reg(const Register reg, FILE* out);
-void InstructionPrint(const Instruction& instr, FILE* out_f);
+template<typename T>
+static inline void _print_byte(T byte, FILE* out)
+{
+  fprintf(out, "0b");
+  const size_t num_bits = 8 * sizeof(byte);
+
+  for(u8 i=0; i<num_bits; i++)
+  {
+    if((byte>> ((num_bits-1) - i)) & 0x1)
+    {
+      fprintf(out, "1");
+    }else
+    {
+      fprintf(out, "0");
+    }
+  }
+  fprintf(out, " (%d)", byte);
+}
+
+void print_seg(const Segment seg, FILE* out = stdout);
+void print_disp(const Displacement* disp, FILE *out = stdout);
+void print_reg(const Register reg, FILE* out = stdout);
+void InstructionPrint(const Instruction& instr, FILE* out_f = stdout);
+void CPUPrint(CPU* cpu, FILE* out = stdout);
 
 #define TODO(...)\
   do{printf("%s.%d: TODO: %s\n", __FILE__, __LINE__, __VA_ARGS__""); exit(99);}while(0);

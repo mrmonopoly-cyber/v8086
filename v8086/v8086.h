@@ -48,6 +48,7 @@ static inline int v8086RegSize(v8086& self)
 ProgramID ProgramLoad(v8086& self, const char* file_program_path, const ProgramOptInfo& prog_info={});
   
 int ProgramDumpNextInstr(v8086& self,const ProgramID prog_id, Instruction* out);
+void V8086Dump(v8086& self, FILE* out=stdout);
 
 int ProgramRun(v8086& self, ProgramID prog_id);
 
