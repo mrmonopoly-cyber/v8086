@@ -1572,8 +1572,8 @@ static void _init_decoders_table(void)
     decoders[0b10100010 + i] = _decode_mov_acc_to_mem;
   }
 
-  decoders[0b10001110] = _decode_mov_reg_mem_to_seg_reg;
-  decoders[0b10001100] = _decode_mov_seg_reg_to_reg_mem;
+  decoders[0b10001110] = _decode_mov_seg_reg_to_reg_mem;
+  decoders[0b10001100] = _decode_mov_reg_mem_to_seg_reg;
 
   for(u8 i=0; i<= 0b11; i++)
   {
@@ -1830,11 +1830,13 @@ static void _init_decoders_table(void)
   decoders[0b11111111] = _decode_indirect_intersegment;
 }
 
-u32 InstructionDecode(const u8* mem, const u32 mem_size, Instruction* const out)
+u32 InstructionDecode(const u8* mem, const u32 mem_size, Instruction* out)
 {
   u32 res = 0;
   u8 opcode;
   f_instruction_decoder decoder;
+
+  if(!out) return -99;
 
   *out = {};
   out->seg = SegNone;
@@ -1846,6 +1848,7 @@ u32 InstructionDecode(const u8* mem, const u32 mem_size, Instruction* const out)
 
   out->op = Opcode::INVALID;
   res = decoder(opcode, mem + 1, mem_size -1, out);
+  out->size = res;
 
   return res;
 }
