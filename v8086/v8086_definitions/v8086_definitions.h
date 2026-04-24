@@ -283,9 +283,30 @@ enum FullRegs :size_t
   __reg_count
 };
 
+#define GET_CF(flags) ((flags) & (0x1u << 0))
+#define GET_PF(flags) ((flags) & (0x1u << 2))
+#define GET_AF(flags) ((flags) & (0x1u << 4))
+#define GET_ZF(flags) ((flags) & (0x1u << 6))
+#define GET_SF(flags) ((flags) & (0x1u << 7))
+#define GET_TF(flags) ((flags) & (0x1u << 8))
+#define GET_IF(flags) ((flags) & (0x1u << 9))
+#define GET_DF(flags) ((flags) & (0x1u << 10))
+#define GET_OF(flags) ((flags) & (0x1u << 11))
+
+#define NEW_CF(bit) ((bit) << 0)
+#define NEW_PF(bit) ((bit) << 2)
+#define NEW_AF(bit) ((bit) << 4)
+#define NEW_ZF(bit) ((bit) << 6)
+#define NEW_SF(bit) ((bit) << 7)
+#define NEW_TF(bit) ((bit) << 8)
+#define NEW_IF(bit) ((bit) << 9)
+#define NEW_DF(bit) ((bit) << 10)
+#define NEW_OF(bit) ((bit) << 11)
+
 struct CPU{
   CPURegister regs[__reg_count];
   u16 ip;
+  u8 flags;
 };
 
 template<typename T>
