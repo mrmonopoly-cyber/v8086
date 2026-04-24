@@ -1,9 +1,9 @@
 #include "exec.h"
 
-#include <cstring>
-#include <v8086_definitions.h>
-
 #include <assert.h>
+#include <string.h>
+
+#include <v8086_definitions.h>
 
 typedef s32 (*op_exec)(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment]);
 
@@ -173,6 +173,8 @@ static s32 _exec_mov(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
 
   dst = _arg_to_ptr(&instr->args[0], cpu, segmens, &byte_to_move);
   src = _arg_to_ptr(&instr->args[1], cpu, segmens);
+
+  cpu->ip += instr->size;
 
   memcpy(dst, src, byte_to_move);
 

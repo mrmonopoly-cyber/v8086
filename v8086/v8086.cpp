@@ -117,19 +117,19 @@ int ProgramDumpNextInstr(v8086& self,const ProgramID prog_id, Instruction* out)
   const u32 prog_length = prog->segment[CS].written;
   u32 index = prog->decoding_index;
   u32 physical_addr = 0;
-  s32 written =0;
+  s32 status =0;
   u8* mem_ptr = nullptr;
 
   if(index < prog->segment[CS].written)
   {
     physical_addr = AddrFromSegment(prog->segment[CS].log_seg, index);
     mem_ptr = PhyGetAddrAt(self.memory, physical_addr);
-    written = InstructionDecode(mem_ptr, prog_length - index ,out);
+    status = InstructionDecode(mem_ptr, prog_length - index ,out);
 
-    if(written)
+    if(status)
     {
       res=0;
-      prog->decoding_index += written;
+      prog->decoding_index += out->size;
     }
     else
     {
@@ -149,26 +149,24 @@ int ProgramRun(v8086& self, ProgramID prog_id)
   Program* prog = &self.running[prog_id];
   const u32 prog_length = prog->segment[CS].written;
   u32 physical_addr = 0;
-  s32 written =0;
   u8* mem_ptr = nullptr;
   Instruction instr = {};
   s32 err=0;
-  u32 index=0;
   SegmentView segs[__Num_Segment];
 
-  _get_seg_view(&self, prog->segment[CS], &segs[CS]);
-  _get_seg_view(&self, prog->segment[SS], &segs[SS]);
-  _get_seg_view(&self, prog->segment[DS], &segs[DS]);
-  _get_seg_view(&self, prog->segment[ES], &segs[ES]);
-
-
-  while(index < prog->segment[CS].written)
+  for(size_t i=0; i<__Num_Segment; i++)
   {
-    physical_addr = AddrFromSegment(prog->segment[CS].log_seg, index);
-    mem_ptr = PhyGetAddrAt(self.memory, physical_addr);
-    written = InstructionDecode(mem_ptr, prog_length - index, &instr);
+    _get_seg_view(&self, prog->segment[i], &segs[i]);
+  }
 
-    if(written)
+  while(self.cpu.ip < prog->segment[CS].written)
+  {
+    physical_addr = AddrFromSegment(prog->segment[CS].log_seg, self.cpu.ip);
+    mem_ptr = PhyGetAddrAt(self.memory, physical_addr);
+
+    err = InstructionDecode(mem_ptr, prog_length - self.cpu.ip, &instr);
+
+    if(err)
     {
       res=0;
       if((err=InstructionExec(&instr, &self.cpu, segs))<0)
@@ -179,8 +177,6 @@ int ProgramRun(v8086& self, ProgramID prog_id)
         res = err;
         break;
       }
-      instr = {};
-      index += written;
     }
     else
     {
@@ -195,7 +191,39 @@ int ProgramRun(v8086& self, ProgramID prog_id)
   return res;
 }
 
-void V8086Dump(v8086& self, FILE* out)
+void V8086Dump(v8086& self, ProgramID prog_id, FILE* out)
 {
+  if(out == nullptr) out = stdout;
   CPUPrint(&self.cpu, out);
+  Program* prog = &self.running[prog_id];
+  if(prog_id>=0)
+  {
+    for(size_t i=0; i<__Num_Segment; i++)
+    {
+      switch ((Segment)i)
+      {
+        case ES:
+          fprintf(out, "ES");
+          break;
+        case CS:
+          fprintf(out, "CS");
+          break;
+        case SS:
+          fprintf(out, "SS");
+          break;
+        case DS:
+          fprintf(out, "DS");
+          break;
+        case SegNone:
+          assert(0 && "unreachable V8086Dump, SegNone");
+          break;
+        case __Num_Segment:
+          assert(0 && "unreachable V8086Dump, __Num_Segment");
+          break;
+      }
+      fprintf(out, " segment\n");
+      SegmentPrint(&prog->segment[i].log_seg, &self.memory);
+    }
+  }
+
 }

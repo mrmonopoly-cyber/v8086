@@ -19,3 +19,4 @@ static inline u32 AddrFromSegment(const LogicalSegment& seg, const u16 offset=0)
   return res;
 }
 
+void SegmentPrint(LogicalSegment* seg, PhyMemory* mem, FILE* out = stdout, u32 amount = 5);

@@ -117,13 +117,14 @@ int main(int argc, char *argv[])
     }
   }
 
+  fprintf(input.out, "\n\n");
   if(input.exec_options & ExecOptions::Run)
   {
     if((res=ProgramRun(v8086, pid))<0)
     {
       fprintf(stderr, "error running the program: %d\n", res);
     }
-    V8086Dump(v8086, input.out);
+    V8086Dump(v8086, pid, input.out);
   }
 
 

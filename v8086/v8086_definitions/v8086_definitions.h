@@ -253,6 +253,7 @@ struct Instruction{
   Prefix prefix;
   Segment seg;
   Opcode op;
+  u16 size;
   Arg args[2];
 };
 
@@ -284,6 +285,7 @@ enum FullRegs :size_t
 
 struct CPU{
   CPURegister regs[__reg_count];
+  u16 ip;
 };
 
 template<typename T>
