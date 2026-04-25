@@ -13,7 +13,8 @@ typedef union
   s16 _s16;
 }NumConv;
 
-typedef s32 (*op_exec)(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment]);
+typedef s32 (*op_exec)(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment],
+    u16* old_val, u16* new_val);
 
 static u8 dummy_u8_buffer;
 static op_exec executor [(size_t)Opcode::__Opcode_count];
@@ -162,35 +163,43 @@ static inline u8* _arg_to_ptr(
   return res;
 }
 
-static s32 invalid_op_exec(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment])
+static s32 invalid_op_exec(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment],
+    u16* old_val, u16* new_val)
 {
   s32 res=-1;
 
   UNUSED(cpu);
   UNUSED(instr);
   UNUSED(segmens);
+  UNUSED(old_val);
+  UNUSED(new_val);
 
   return res;
 }
 
-static s32 _exec_mov(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment])
+static s32 _exec_mov(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment],
+    u16* old_val, u16* new_val)
 {
   s32 res=0;
   u8* src, *dst;
   u8 byte_to_move = 1;
+
 
   dst = _arg_to_ptr(&instr->args[0], cpu, segmens, &byte_to_move);
   src = _arg_to_ptr(&instr->args[1], cpu, segmens);
 
   cpu->ip += instr->size;
 
+  memcpy(old_val, dst, byte_to_move);
   memcpy(dst, src, byte_to_move);
+  memcpy(new_val, dst, byte_to_move);
 
   return res;
 }
 
 //INFO: add updates AF, CF, OF, PF, FS, ZF
-static s32 _exec_add(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment])
+static s32 _exec_add(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment],
+    u16* old_val, u16* new_val)
 {
   s32 res=0;
   u8* src, *dst;
@@ -200,7 +209,7 @@ static s32 _exec_add(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
   u8 cf;
 
   cpu->ip += instr->size;
-  CPU_flag_clear(cpu, (1<<OF) | (1<<SF) | (1<<CF) | (1<<ZF));
+  flag_clear(&cpu->flags, (1<<OF) | (1<<SF) | (1<<CF) | (1<<ZF));
 
   dst = _arg_to_ptr(&instr->args[0], cpu, segmens, &byte_to_move);
   src = _arg_to_ptr(&instr->args[1], cpu, segmens);
@@ -220,7 +229,7 @@ static s32 _exec_add(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
       cf = old_v._s8 >=0 && num_d._s8 < 0;
       if(num_d._s8 >0 && num_s._s8 > 0 && old_v._s8 <0 && num_d._s8 < 0)
       {
-        CPU_flag_set(cpu, 1 << OF);
+        flag_set(&cpu->flags, 1 << OF);
       }
       break;
     case 0x2:
@@ -229,19 +238,22 @@ static s32 _exec_add(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
       cf = old_v._s16 >=0 && num_d._s16 < 0;
       if(num_d._s16 >0 && num_s._s16 > 0 && old_v._s16 <0 && num_d._s16 < 0)
       {
-        CPU_flag_set(cpu, 1 << OF);
+        flag_set(&cpu->flags, 1 << OF);
       }
       break;
   }
 
+  memcpy(old_val, dst, byte_to_move);
   memcpy(dst, &num_d, byte_to_move);
-  CPU_flag_set(cpu, (sf << SF) | (cf << CF) | (!(num_d._s16) << ZF));
+  memcpy(new_val, dst, byte_to_move);
+  flag_set(&cpu->flags, (sf << SF) | (cf << CF) | (!(num_d._s16) << ZF));
 
   return res;
 }
 
 //INFO: sub updates AF, CF, OF, PF, FS, ZF
-static s32 _exec_sub(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment])
+static s32 _exec_sub(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment],
+    u16* old_val, u16* new_val)
 {
   s32 res=0;
   u8* src, *dst;
@@ -251,7 +263,7 @@ static s32 _exec_sub(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
   u8 cf;
 
   cpu->ip += instr->size;
-  CPU_flag_clear(cpu, (1<<OF) | (1<<SF) | (1<<CF) | (1<<ZF));
+  flag_clear(&cpu->flags, (1<<OF) | (1<<SF) | (1<<CF) | (1<<ZF));
 
   dst = _arg_to_ptr(&instr->args[0], cpu, segmens, &byte_to_move);
   src = _arg_to_ptr(&instr->args[1], cpu, segmens);
@@ -277,14 +289,17 @@ static s32 _exec_sub(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
       break;
   }
 
+  memcpy(old_val, dst, byte_to_move);
   memcpy(dst, &num_d, byte_to_move);
-  CPU_flag_set(cpu, (sf << SF) | (cf << CF) | (!(num_d._s16) << ZF));
+  memcpy(new_val, dst, byte_to_move);
+  flag_set(&cpu->flags, (sf << SF) | (cf << CF) | (!(num_d._s16) << ZF));
 
   return res;
 }
 
 //INFO: cmp updates AF, CF, OF, PF, FS, ZF
-static s32 _exec_cmp(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment])
+static s32 _exec_cmp(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment],
+    u16* old_val, u16* new_val)
 {
   s32 res=0;
   u8* src, *dst;
@@ -293,8 +308,11 @@ static s32 _exec_cmp(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
   u8 sf;
   u8 cf;
 
+  UNUSED(old_val);
+  UNUSED(new_val);
+
   cpu->ip += instr->size;
-  CPU_flag_clear(cpu, (1<<OF) | (1<<SF) | (1<<CF) | (1<<ZF));
+  flag_clear(&cpu->flags, (1<<OF) | (1<<SF) | (1<<CF) | (1<<ZF));
 
   dst = _arg_to_ptr(&instr->args[0], cpu, segmens, &byte_to_move);
   src = _arg_to_ptr(&instr->args[1], cpu, segmens);
@@ -320,7 +338,7 @@ static s32 _exec_cmp(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
       break;
   }
 
-  CPU_flag_set(cpu, (sf << SF) | (cf << CF) | (!(num_d._s16) << ZF));
+  flag_set(&cpu->flags, (sf << SF) | (cf << CF) | (!(num_d._s16) << ZF));
 
   return res;
 }
@@ -339,12 +357,16 @@ static void init_executor_array(void)
   executor[(size_t)Opcode::cmp] = _exec_cmp;
 }
 
-s32 InstructionExec(Instruction* const instr, CPU* cpu, SegmentView segmens[__Num_Segment])
+s32 InstructionExec(Instruction* const instr, CPU* cpu, SegmentView segmens[__Num_Segment],
+    u16* old_val, u16* new_val)
 {
   s32 res=0;
   op_exec exec = executor[(size_t)instr->op];
 
-  res = exec(instr, cpu, segmens);
+  *old_val = 0;
+  *new_val = 0;
+
+  res = exec(instr, cpu, segmens, old_val, new_val);
 
   return res;
 }

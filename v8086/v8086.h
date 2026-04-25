@@ -50,7 +50,13 @@ ProgramID ProgramLoad(v8086& self, const char* file_program_path, const ProgramO
 int ProgramDumpNextInstr(v8086& self,const ProgramID prog_id, Instruction* out);
 void V8086Dump(v8086& self, ProgramID prog_id =-1, FILE* out=stdout);
 
-int ProgramRun(v8086& self, ProgramID prog_id);
+enum RunMode
+{
+  Normal,
+  Debug
+};
+
+int ProgramRun(v8086& self, ProgramID prog_id, RunMode mode = RunMode::Normal);
 
 static inline void v8086Shutdown(v8086& self)
 {

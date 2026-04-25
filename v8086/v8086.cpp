@@ -143,7 +143,7 @@ int ProgramDumpNextInstr(v8086& self,const ProgramID prog_id, Instruction* out)
   return res;
 }
 
-int ProgramRun(v8086& self, ProgramID prog_id)
+int ProgramRun(v8086& self, ProgramID prog_id, RunMode mode)
 {
   int res=-1;
   Program* prog = &self.running[prog_id];
@@ -153,6 +153,8 @@ int ProgramRun(v8086& self, ProgramID prog_id)
   Instruction instr = {};
   s32 err=0;
   SegmentView segs[__Num_Segment];
+  u16 old_val, new_val;
+  u8 old_flags = self.cpu.flags;
 
   for(size_t i=0; i<__Num_Segment; i++)
   {
@@ -165,11 +167,12 @@ int ProgramRun(v8086& self, ProgramID prog_id)
     mem_ptr = PhyGetAddrAt(self.memory, physical_addr);
 
     err = InstructionDecode(mem_ptr, prog_length - self.cpu.ip, &instr);
+    
 
     if(err)
     {
       res=0;
-      if((err=InstructionExec(&instr, &self.cpu, segs))<0)
+      if((err=InstructionExec(&instr, &self.cpu, segs, &old_val, &new_val))<0)
       {
         fprintf(stderr, "execution error: %d with instr: ", err);
         InstructionPrint(instr, stderr);
@@ -177,6 +180,21 @@ int ProgramRun(v8086& self, ProgramID prog_id)
         res = err;
         break;
       }
+      else if(mode == RunMode::Debug)
+      {
+        InstructionPrint(instr);
+        fprintf(stdout, "\t ; 0x%x -> 0x%x", old_val, new_val);
+        if(old_val < 0xFF && new_val < 0xFF)
+        {
+          fprintf(stdout, "\t");
+        }
+        fprintf(stdout, "\tFLAGS: ");
+        flag_print(old_flags, stdout);
+        fprintf(stdout, " -> ");
+        flag_print(self.cpu.flags, stdout);
+        fprintf(stdout, "\n");
+      }
+      old_flags = self.cpu.flags;
     }
     else
     {

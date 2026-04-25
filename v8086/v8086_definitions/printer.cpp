@@ -1,4 +1,4 @@
-#include <cstdio>
+#include "cpu.h"
 #include <v8086_definitions.h>
 
 static void _print_arg(const Arg* const arg, FILE* out, const Segment seg)
@@ -276,8 +276,5 @@ void CPUPrint(CPU* cpu, FILE* out)
   }
 
   fprintf(out, "FLAGS:\n");
-  fprintf(out, "CF:%d, PF:%d, AF:%d, ZF:%d, SF:%d, TF:%d, IF:%d, DF:%d, OF:%d\n",
-    CPU_flag_get(cpu, CF), CPU_flag_get(cpu, PF), CPU_flag_get(cpu, AF), CPU_flag_get(cpu, ZF),
-    CPU_flag_get(cpu, SF), CPU_flag_get(cpu, TF), CPU_flag_get(cpu, IF), CPU_flag_get(cpu, DF),
-    CPU_flag_get(cpu, OF));
+  flag_print_all(cpu->flags, out);
 }
