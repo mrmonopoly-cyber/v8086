@@ -276,8 +276,8 @@ void CPUPrint(CPU* cpu, FILE* out)
   }
 
   fprintf(out, "FLAGS:\n");
-  fprintf(out, "CF:%d, PF:%d, AF:%d, ZF:%d, SF:%d, TF:%d, IF:%d, DF:%d, OF:%d\n"
-      ,GET_CF(cpu->flags), GET_PF(cpu->flags), GET_AF(cpu->flags), GET_ZF(cpu->flags),
-      GET_SF(cpu->flags), GET_TF(cpu->flags), GET_IF(cpu->flags), GET_DF(cpu->flags),
-      GET_OF(cpu->flags));
+  fprintf(out, "CF:%d, PF:%d, AF:%d, ZF:%d, SF:%d, TF:%d, IF:%d, DF:%d, OF:%d\n",
+    CPU_flag_get(cpu, CF), CPU_flag_get(cpu, PF), CPU_flag_get(cpu, AF), CPU_flag_get(cpu, ZF),
+    CPU_flag_get(cpu, SF), CPU_flag_get(cpu, TF), CPU_flag_get(cpu, IF), CPU_flag_get(cpu, DF),
+    CPU_flag_get(cpu, OF));
 }
