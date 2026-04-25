@@ -188,10 +188,13 @@ int ProgramRun(v8086& self, ProgramID prog_id, RunMode mode)
         {
           fprintf(stdout, "\t");
         }
-        fprintf(stdout, "\tFLAGS: ");
-        flag_print(old_flags, stdout);
-        fprintf(stdout, " -> ");
-        flag_print(self.cpu.flags, stdout);
+        if(old_flags != self.cpu.flags)
+        {
+          fprintf(stdout, "\tFLAGS: ");
+          flag_print(old_flags, stdout);
+          fprintf(stdout, " -> ");
+          flag_print(self.cpu.flags, stdout);
+        }
         fprintf(stdout, "\n");
       }
       old_flags = self.cpu.flags;

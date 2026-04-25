@@ -19,6 +19,24 @@ typedef s32 (*op_exec)(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_S
 static u8 dummy_u8_buffer;
 static op_exec executor [(size_t)Opcode::__Opcode_count];
 
+static inline void _check_set_parity_flag(CPU* cpu, NumConv val, u8 byte_to_read)
+{
+  u8 num_1=0;
+  u8 cval = val._s8;
+  flag_clear(&cpu->flags, 1 << PF);
+
+  for(u8 i=0; i<byte_to_read * 8; i++)
+  {
+    num_1 += ((cval >> i) & 0x1);
+  }
+
+  if(!(num_1 & 0x1)) //even
+  {
+    flag_set(&cpu->flags, 1 << PF);
+  }
+}
+
+
 static inline u8* _reg_to_ptr(Register reg, CPU* cpu, u8* o_reg_size = &dummy_u8_buffer)
 {
   u8* res = nullptr;
@@ -248,6 +266,8 @@ static s32 _exec_add(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
   memcpy(new_val, dst, byte_to_move);
   flag_set(&cpu->flags, (sf << SF) | (cf << CF) | (!(num_d._s16) << ZF));
 
+  _check_set_parity_flag(cpu, num_d, byte_to_move);
+
   return res;
 }
 
@@ -294,6 +314,8 @@ static s32 _exec_sub(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
   memcpy(new_val, dst, byte_to_move);
   flag_set(&cpu->flags, (sf << SF) | (cf << CF) | (!(num_d._s16) << ZF));
 
+  _check_set_parity_flag(cpu, num_d, byte_to_move);
+
   return res;
 }
 
@@ -339,6 +361,7 @@ static s32 _exec_cmp(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
   }
 
   flag_set(&cpu->flags, (sf << SF) | (cf << CF) | (!(num_d._s16) << ZF));
+  _check_set_parity_flag(cpu, num_d, byte_to_move);
 
   return res;
 }
