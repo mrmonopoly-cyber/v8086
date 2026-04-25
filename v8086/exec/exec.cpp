@@ -1,9 +1,17 @@
 #include "exec.h"
+#include "cpu.h"
 
 #include <assert.h>
+#include <cstdio>
 #include <string.h>
 
 #include <v8086_definitions.h>
+
+typedef union
+{
+  s8 _s8;
+  s16 _s16;
+}NumConv;
 
 typedef s32 (*op_exec)(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment]);
 
@@ -181,6 +189,142 @@ static s32 _exec_mov(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
   return res;
 }
 
+//INFO: add updates AF, CF, OF, PF, FS, ZF
+static s32 _exec_add(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment])
+{
+  s32 res=0;
+  u8* src, *dst;
+  u8 byte_to_move = 1;
+  NumConv num_s={0}, num_d={0}, old_v;
+  u8 sf;
+  u8 cf;
+
+  cpu->ip += instr->size;
+  CPU_flag_clear(cpu, (1<<OF) | (1<<SF) | (1<<CF) | (1<<ZF));
+
+  dst = _arg_to_ptr(&instr->args[0], cpu, segmens, &byte_to_move);
+  src = _arg_to_ptr(&instr->args[1], cpu, segmens);
+
+  assert(byte_to_move >=1 && byte_to_move <= 2);
+
+  memcpy(&num_s._s16, src, byte_to_move);
+  memcpy(&num_d._s16, dst, byte_to_move);
+
+  old_v = num_d;
+
+  switch (byte_to_move)
+  {
+    case 0x1:
+      num_d._s8 += num_s._s8;
+      sf = num_d._s8 < 0;
+      cf = old_v._s8 >=0 && num_d._s8 < 0;
+      if(num_d._s8 >0 && num_s._s8 > 0 && old_v._s8 <0 && num_d._s8 < 0)
+      {
+        CPU_flag_set(cpu, 1 << OF);
+      }
+      break;
+    case 0x2:
+      num_d._s16 += num_s._s16;
+      sf = num_d._s16 < 0;
+      cf = old_v._s16 >=0 && num_d._s16 < 0;
+      if(num_d._s16 >0 && num_s._s16 > 0 && old_v._s16 <0 && num_d._s16 < 0)
+      {
+        CPU_flag_set(cpu, 1 << OF);
+      }
+      break;
+  }
+
+  memcpy(dst, &num_d, byte_to_move);
+  CPU_flag_set(cpu, (sf << SF) | (cf << CF) | (!(num_d._s16) << ZF));
+
+  return res;
+}
+
+//INFO: sub updates AF, CF, OF, PF, FS, ZF
+static s32 _exec_sub(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment])
+{
+  s32 res=0;
+  u8* src, *dst;
+  u8 byte_to_move = 1;
+  NumConv num_s={0}, num_d={0}, old_v;
+  u8 sf;
+  u8 cf;
+
+  cpu->ip += instr->size;
+  CPU_flag_clear(cpu, (1<<OF) | (1<<SF) | (1<<CF) | (1<<ZF));
+
+  dst = _arg_to_ptr(&instr->args[0], cpu, segmens, &byte_to_move);
+  src = _arg_to_ptr(&instr->args[1], cpu, segmens);
+
+  assert(byte_to_move >=1 && byte_to_move <= 2);
+
+  memcpy(&num_s._s16, src, byte_to_move);
+  memcpy(&num_d._s16, dst, byte_to_move);
+
+  old_v = num_d;
+
+  switch (byte_to_move)
+  {
+    case 0x1:
+      num_d._s8 -= num_s._s8;
+      sf = num_d._s8 < 0;
+      cf = old_v._s8 >=0 && num_d._s8 < 0;
+      break;
+    case 0x2:
+      num_d._s16 -= num_s._s16;
+      sf = num_d._s16 < 0;
+      cf = old_v._s16 >=0 && num_d._s16 < 0;
+      break;
+  }
+
+  memcpy(dst, &num_d, byte_to_move);
+  CPU_flag_set(cpu, (sf << SF) | (cf << CF) | (!(num_d._s16) << ZF));
+
+  return res;
+}
+
+//INFO: cmp updates AF, CF, OF, PF, FS, ZF
+static s32 _exec_cmp(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment])
+{
+  s32 res=0;
+  u8* src, *dst;
+  u8 byte_to_move = 1;
+  NumConv num_s={0}, num_d={0}, old_v;
+  u8 sf;
+  u8 cf;
+
+  cpu->ip += instr->size;
+  CPU_flag_clear(cpu, (1<<OF) | (1<<SF) | (1<<CF) | (1<<ZF));
+
+  dst = _arg_to_ptr(&instr->args[0], cpu, segmens, &byte_to_move);
+  src = _arg_to_ptr(&instr->args[1], cpu, segmens);
+
+  assert(byte_to_move >=1 && byte_to_move <= 2);
+
+  memcpy(&num_s._s16, src, byte_to_move);
+  memcpy(&num_d._s16, dst, byte_to_move);
+
+  old_v = num_d;
+
+  switch (byte_to_move)
+  {
+    case 0x1:
+      num_d._s8 -= num_s._s8;
+      sf = num_d._s8 < 0;
+      cf = old_v._s8 >=0 && num_d._s8 < 0;
+      break;
+    case 0x2:
+      num_d._s16 -= num_s._s16;
+      sf = num_d._s16 < 0;
+      cf = old_v._s16 >=0 && num_d._s16 < 0;
+      break;
+  }
+
+  CPU_flag_set(cpu, (sf << SF) | (cf << CF) | (!(num_d._s16) << ZF));
+
+  return res;
+}
+
 __attribute__((constructor))
 static void init_executor_array(void)
 {
@@ -190,6 +334,9 @@ static void init_executor_array(void)
   }
 
   executor[(size_t)Opcode::mov] = _exec_mov;
+  executor[(size_t)Opcode::sub] = _exec_sub;
+  executor[(size_t)Opcode::add] = _exec_add;
+  executor[(size_t)Opcode::cmp] = _exec_cmp;
 }
 
 s32 InstructionExec(Instruction* const instr, CPU* cpu, SegmentView segmens[__Num_Segment])
