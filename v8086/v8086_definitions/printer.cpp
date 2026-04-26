@@ -221,58 +221,38 @@ void CPUPrint(CPU* cpu, FILE* out)
     switch ((FullRegs)r)
     {
       case ax:
-        fprintf(out, "ax: ");
-        _print_byte(cpu->regs[r]._u16 , out);
-        fprintf(out, "\tah: ");
-        _print_byte(cpu->regs[r]._half.h, out);
-        fprintf(out, "\tal: ");
-        _print_byte(cpu->regs[r]._half.l, out);
+        fprintf(out, "ax: 0x%04x\tah: 0x%02x\tal: 0x%02x",
+            cpu->regs[r]._u16, cpu->regs[r]._half.h, cpu->regs[r]._half.l);
         break;
       case bx:
-        fprintf(out, "bx: ");
-        _print_byte(cpu->regs[r]._u16 , out);
-        fprintf(out, "\tbh: ");
-        _print_byte(cpu->regs[r]._half.h, out);
-        fprintf(out, "\tbl: ");
-        _print_byte(cpu->regs[r]._half.l, out);
+        fprintf(out, "bx: 0x%04x\tbh: 0x%02x\tbl: 0x%02x",
+            cpu->regs[r]._u16, cpu->regs[r]._half.h, cpu->regs[r]._half.l);
         break;
       case cx:
-        fprintf(out, "cx: ");
-        _print_byte(cpu->regs[r]._u16 , out);
-        fprintf(out, "\tch: ");
-        _print_byte(cpu->regs[r]._half.h, out);
-        fprintf(out, "\tcl: ");
-        _print_byte(cpu->regs[r]._half.l, out);
+        fprintf(out, "cx: 0x%04x\tch: 0x%02x\tcl: 0x%02x",
+            cpu->regs[r]._u16, cpu->regs[r]._half.h, cpu->regs[r]._half.l);
         break;
       case dx:
-        fprintf(out, "dx: ");
-        _print_byte(cpu->regs[r]._u16 , out);
-        fprintf(out, "\tdh: ");
-        _print_byte(cpu->regs[r]._half.h, out);
-        fprintf(out, "\tdl: ");
-        _print_byte(cpu->regs[r]._half.l, out);
+        fprintf(out, "dx: 0x%04x\tdh: 0x%02x\tdl: 0x%02x",
+            cpu->regs[r]._u16, cpu->regs[r]._half.h, cpu->regs[r]._half.l);
         break;
       case si:
-        fprintf(out, "si: ");
-        _print_byte(cpu->regs[r]._u16 , out);
+        fprintf(out, "si: 0x%04x", cpu->regs[r]._u16);
         break;
       case di:
-        fprintf(out, "di: ");
-        _print_byte(cpu->regs[r]._u16 , out);
+        fprintf(out, "di: 0x%04x", cpu->regs[r]._u16);
         break;
       case sp:
-        fprintf(out, "sp: ");
-        _print_byte(cpu->regs[r]._u16 , out);
+        fprintf(out, "sp: 0x%04x", cpu->regs[r]._u16);
         break;
       case bp:
-        fprintf(out, "bp: ");
-        _print_byte(cpu->regs[r]._u16 , out);
+        fprintf(out, "bp: 0x%04x", cpu->regs[r]._u16);
         break;
       case __reg_count:
         assert(0 && "__reg_count not printable");
         break;
     }
-    fprintf(out, "\n");
+    fprintf(out, "\t(%d)\n", cpu->regs[r]._u16);
   }
 
   fprintf(out, "FLAGS:\n");
