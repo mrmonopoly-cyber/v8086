@@ -1,7 +1,7 @@
 #include "cpu.h"
 #include <v8086_definitions.h>
 
-static void _print_arg(const Arg* const arg, FILE* out, const Segment seg)
+void print_arg(const Arg* const arg, FILE* out, const Segment seg)
 {
   switch (arg->t)
   {
@@ -206,11 +206,11 @@ void InstructionPrint(const Instruction& instr, FILE* out_f)
   }
 
 
-  _print_arg(&instr.args[0], out_f, instr.seg);
+  print_arg(&instr.args[0], out_f, instr.seg);
   if(instr.args[1].t)
   {
     fprintf(out_f, ", ");
-    _print_arg(&instr.args[1], out_f,  instr.seg);
+    print_arg(&instr.args[1], out_f,  instr.seg);
   }
 }
 

@@ -183,14 +183,16 @@ int ProgramRun(v8086& self, ProgramID prog_id, RunMode mode)
       else if(mode == RunMode::Debug)
       {
         InstructionPrint(instr);
-        fprintf(stdout, "\t ; 0x%x -> 0x%x", old_val, new_val);
-        if(old_val < 0xFF && new_val < 0xFF)
+        fprintf(stdout, "\t ; ");
+        if(old_val != new_val)
         {
+          print_arg(&instr.args[0], stdout, instr.seg);
+          fprintf(stdout, " = 0x%x -> 0x%x", old_val, new_val);
           fprintf(stdout, "\t");
         }
         if(old_flags != self.cpu.flags)
         {
-          fprintf(stdout, "\tFLAGS: ");
+          fprintf(stdout, "FLAGS: ");
           flag_print(old_flags, stdout);
           fprintf(stdout, " -> ");
           flag_print(self.cpu.flags, stdout);

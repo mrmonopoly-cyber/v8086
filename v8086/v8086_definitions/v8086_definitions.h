@@ -270,6 +270,7 @@ static inline void _print_byte(T byte, FILE* out)
 void print_seg(const Segment seg, FILE* out = stdout);
 void print_disp(const Displacement* disp, FILE *out = stdout);
 void print_reg(const Register reg, FILE* out = stdout);
+void print_arg(const Arg* const arg, FILE* out, const Segment seg);
 void InstructionPrint(const Instruction& instr, FILE* out_f = stdout);
 void CPUPrint(CPU* cpu, FILE* out = stdout);
 
