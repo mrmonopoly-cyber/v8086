@@ -4,7 +4,9 @@
 
 #include "types.h"
 
-enum Flags : u16
+typedef u16 FlagsReg;
+
+enum Flags : FlagsReg
 {
     CF = 0,
     PF = 2,
@@ -48,24 +50,24 @@ enum FullRegs :size_t
 struct CPU{
   CPURegister regs[__reg_count];
   u16 ip;
-  u8 flags;
+  FlagsReg flags;
 };
 
-static inline void flag_set(u8* flags, u16 values)
+static inline void flag_set(FlagsReg* flags, FlagsReg values)
 {
   *flags |= values;
 }
-static inline void flag_clear(u8 *flags, u16 values)
+static inline void flag_clear(FlagsReg *flags, FlagsReg values)
 {
   *flags &= (~0) ^ values;
 }
 
-static inline u8 flag_get(const u8 flags, const Flags flag)
+static inline u8 flag_get(const FlagsReg flags, const Flags flag)
 {
   return (flags & (1 << flag)) > 0;
 }
 
-static void inline flag_print(const u8 flags, FILE* out)
+static void inline flag_print(const FlagsReg flags, FILE* out)
 {
   static char flags_str[] = "C_P_A_ZSTIDO";
 
@@ -78,7 +80,7 @@ static void inline flag_print(const u8 flags, FILE* out)
   }
 }
 
-static void inline flag_print_all(u8 flags, FILE* out)
+static void inline flag_print_all(FlagsReg flags, FILE* out)
 {
   fprintf(out, "CF:%d, PF:%d, AF:%d, ZF:%d, SF:%d, TF:%d, IF:%d, DF:%d, OF:%d\n",
     flag_get(flags, CF), flag_get(flags, PF), flag_get(flags, AF), flag_get(flags, ZF),

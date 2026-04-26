@@ -57,9 +57,8 @@ static inline void _check_set_overflow_flag(CPU* cpu, NumConv val)
     ((val.t == ConvType::S8) && ((val._s32 < min_s8) || (val._s32 > max_s8))) ||
     ((val.t == ConvType::S16) && ((val._s32 < min_s16) || (val._s32 > max_s16)));
 
-  flag_clear(&cpu->flags, 1 << OF);
+  flag_clear(&cpu->flags, 1u << OF);
   flag_set(&cpu->flags, condition << OF);
-
 }
 
 static inline void _check_set_sign_flag(CPU* cpu, NumConv val)
@@ -307,7 +306,7 @@ static s32 _exec_add(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
   cpu->ip += instr->size;
 
   dst = _arg_to_ptr(&instr->args[0], cpu, segmens, (u8*) &num_d.t);
-  src = _arg_to_ptr(&instr->args[1], cpu, segmens, (u8*)&num_s.t);
+  src = _arg_to_ptr(&instr->args[1], cpu, segmens, (u8*) &num_s.t);
 
   _store_sized_value(&num_s, src);
   _store_sized_value(&num_d, dst);

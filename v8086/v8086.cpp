@@ -154,7 +154,7 @@ int ProgramRun(v8086& self, ProgramID prog_id, RunMode mode)
   s32 err=0;
   SegmentView segs[__Num_Segment];
   u16 old_val, new_val;
-  u8 old_flags = self.cpu.flags;
+  FlagsReg old_flags = self.cpu.flags;
 
   for(size_t i=0; i<__Num_Segment; i++)
   {
