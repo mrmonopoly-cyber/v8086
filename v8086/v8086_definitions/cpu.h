@@ -64,7 +64,7 @@ static inline void flag_clear(FlagsReg *flags, FlagsReg values)
 
 static inline u8 flag_get(const FlagsReg flags, const Flags flag)
 {
-  return (flags & (1 << flag)) > 0;
+  return (flags & flag) > 0;
 }
 
 static void inline flag_print(const FlagsReg flags, FILE* out)
@@ -73,7 +73,7 @@ static void inline flag_print(const FlagsReg flags, FILE* out)
 
   for(u16 f= 0u; f<ArraySize(flags_str); f++)
   {
-    if(flag_get(flags, (Flags)f))
+    if(flag_get(flags, (Flags) (1<<f)))
     {
       fprintf(out, "%c", flags_str[f]);
     }

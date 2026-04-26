@@ -2,6 +2,7 @@
 #include "cpu.h"
 
 #include <assert.h>
+#include <cstdio>
 #include <string.h>
 #include <limits.h>
 
@@ -20,6 +21,7 @@ typedef struct
   union{
     s8 _s8;
     s16 _s16;
+    u16 _u16;
     s32 _s32;
   };
 }NumConv;
@@ -30,18 +32,19 @@ typedef s32 (*op_exec)(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_S
 static u8 dummy_u8_buffer;
 static op_exec executor [(size_t)Opcode::__Opcode_count];
 
-static inline void _check_set_carry_flag(CPU* cpu, NumConv val)
+static inline void _check_set_carry_flag(CPU* cpu, u32 arg1, u32 arg2)
 {
-  UNUSED(cpu);
-  UNUSED(val);
-  // TODO();
+  flag_clear(&cpu->flags, CF);
+  flag_set(&cpu->flags, (arg1 < arg2) * CF);
 }
 
-static inline void _check_set_auxiliarry_carry_flag(CPU* cpu, NumConv val)
+static inline void _check_set_auxiliarry_carry_flag(CPU* cpu, u32 arg1, u32 arg2, u32 res)
 {
-  UNUSED(cpu);
-  UNUSED(val);
-  // TODO();
+  const u8 condition= ((arg1 ^ arg2 ^ res) & 0x10) != 0;
+
+
+  flag_clear(&cpu->flags, AF);
+  flag_set(&cpu->flags, condition * AF);
 }
 
 static inline void _check_set_sign_flag(CPU* cpu, NumConv val)
@@ -64,7 +67,7 @@ static inline void _check_set_parity_flag(CPU* cpu, NumConv val)
 {
   u8 num_1=0;
   u8 cval = val._s32;
-  flag_clear(&cpu->flags, 1 << PF);
+  flag_clear(&cpu->flags, PF);
 
   for(u8 i=0; i<val.t* 8; i++)
   {
@@ -73,24 +76,21 @@ static inline void _check_set_parity_flag(CPU* cpu, NumConv val)
 
   if(!(num_1 & 0x1)) //even
   {
-    flag_set(&cpu->flags, 1 << PF);
+    flag_set(&cpu->flags, PF);
   }
 }
 
 static inline void _check_set_overflow_flag(CPU* cpu, NumConv val)
 {
   const u8 condition = 
-    ((val.t == ConvType::S8) && ((val._s32 < INT8_MIN) || (val._s32 > INT8_MAX))) ||
     ((val.t == ConvType::S16) && ((val._s32 < INT16_MIN ) || (val._s32 > INT16_MAX)));
 
   flag_clear(&cpu->flags, OF);
   flag_set(&cpu->flags, condition * OF);
 }
 
-static inline void _check_flags_list(CPU* cpu, NumConv val, FlagsReg flags = FlagsAll)
+static inline void _check_flags_list_no_cf_no_af(CPU* cpu, NumConv val, FlagsReg flags = FlagsAll)
 {
-  if(flags & CF) _check_set_carry_flag(cpu, val);
-  if(flags & AF) _check_set_auxiliarry_carry_flag(cpu, val);
   if(flags & SF) _check_set_sign_flag(cpu, val);
   if(flags & ZF) _check_set_zero_flag(cpu, val);
   if(flags & TF) {}; //TODO:
@@ -332,7 +332,9 @@ static s32 _exec_add(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
   *new_val = num_d._s16;
 
   _load_sized_value(&num_d, dst);
-  _check_flags_list(cpu, num_d);
+  _check_flags_list_no_cf_no_af(cpu, num_d);
+  _check_set_carry_flag(cpu, num_d._s32, num_s._s32);
+  _check_set_auxiliarry_carry_flag(cpu, num_d._s32 - num_s._s32, num_s._s32, num_d._s32);
 
   return res;
 }
@@ -344,7 +346,6 @@ static s32 _exec_sub(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
   s32 res=0;
   u8* src, *dst;
   NumConv num_s={}, num_d={};
-
   cpu->ip += instr->size;
 
   dst = _arg_to_ptr(&instr->args[0], cpu, segmens, (u8*) &num_d.t);
@@ -358,7 +359,9 @@ static s32 _exec_sub(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
   *new_val = num_d._s32;
 
   _load_sized_value(&num_d, dst);
-  _check_flags_list(cpu, num_d);
+  _check_flags_list_no_cf_no_af(cpu, num_d);
+  _check_set_carry_flag(cpu, num_d._s32 + num_s._s32, num_s._s32);
+  _check_set_auxiliarry_carry_flag(cpu, num_d._s32 + num_s._s32, num_s._s32, num_d._s32);
 
   return res;
 }
@@ -383,7 +386,10 @@ static s32 _exec_cmp(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
   _store_sized_value(&num_d, dst);
 
   num_d._s32 -= num_s._s32;
-  _check_flags_list(cpu, num_d);
+
+  _check_flags_list_no_cf_no_af(cpu, num_d);
+  _check_set_carry_flag(cpu, num_d._s32 + num_s._s32, num_s._s32);
+  _check_set_auxiliarry_carry_flag(cpu, num_d._s32 + num_s._s32, num_s._s32, num_d._s32);
 
   return res;
 }
