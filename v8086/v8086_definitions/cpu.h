@@ -8,17 +8,17 @@ typedef u16 FlagsReg;
 
 enum Flags : FlagsReg
 {
-    CF = 0,
-    PF = 2,
-    AF = 4,
-    ZF = 6,
-    SF = 7,
-    TF = 8,
-    IF = 9,
-    DF = 10,
-    OF = 11,
+    CF = 1 << 0,
+    PF = 1 << 2,
+    AF = 1 << 4,
+    ZF = 1 << 6,
+    SF = 1 << 7,
+    TF = 1 << 8,
+    IF = 1 << 9,
+    DF = 1 << 10,
+    OF = 1 << 11,
 
-    __Flag_count
+    FlagsAll = (FlagsReg) ~0,
 };
 
 struct SplitReg{
@@ -71,7 +71,7 @@ static void inline flag_print(const FlagsReg flags, FILE* out)
 {
   static char flags_str[] = "C_P_A_ZSTIDO";
 
-  for(u16 f= 0u; f<__Flag_count; f++)
+  for(u16 f= 0u; f<ArraySize(flags_str); f++)
   {
     if(flag_get(flags, (Flags)f))
     {

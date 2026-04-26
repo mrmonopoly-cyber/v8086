@@ -30,6 +30,36 @@ typedef s32 (*op_exec)(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_S
 static u8 dummy_u8_buffer;
 static op_exec executor [(size_t)Opcode::__Opcode_count];
 
+static inline void _check_set_carry_flag(CPU* cpu, NumConv val)
+{
+  UNUSED(cpu);
+  UNUSED(val);
+  // TODO();
+}
+
+static inline void _check_set_auxiliarry_carry_flag(CPU* cpu, NumConv val)
+{
+  UNUSED(cpu);
+  UNUSED(val);
+  // TODO();
+}
+
+static inline void _check_set_sign_flag(CPU* cpu, NumConv val)
+{
+  flag_clear(&cpu->flags, SF);
+  const u8 condition = 
+    ((val.t == ConvType::S8) && (((s8)val._s32) < 0)) ||
+    ((val.t == ConvType::S16) && (((s16)val._s32) < 0));
+
+  flag_set(&cpu->flags, condition * SF);
+}
+
+static inline void _check_set_zero_flag(CPU* cpu, NumConv val)
+{
+  flag_clear(&cpu->flags, ZF);
+  flag_set(&cpu->flags, (!val._s32) * ZF);
+}
+
 static inline void _check_set_parity_flag(CPU* cpu, NumConv val)
 {
   u8 num_1=0;
@@ -53,33 +83,23 @@ static inline void _check_set_overflow_flag(CPU* cpu, NumConv val)
     ((val.t == ConvType::S8) && ((val._s32 < INT8_MIN) || (val._s32 > INT8_MAX))) ||
     ((val.t == ConvType::S16) && ((val._s32 < INT16_MIN ) || (val._s32 > INT16_MAX)));
 
-  flag_clear(&cpu->flags, 1u << OF);
-  flag_set(&cpu->flags, condition << OF);
+  flag_clear(&cpu->flags, OF);
+  flag_set(&cpu->flags, condition * OF);
 }
 
-static inline void _check_set_sign_flag(CPU* cpu, NumConv val)
+static inline void _check_flags_list(CPU* cpu, NumConv val, FlagsReg flags = FlagsAll)
 {
-  flag_clear(&cpu->flags, 1 << SF);
-  const u8 condition = 
-    ((val.t == ConvType::S8) && (((s8)val._s32) < 0)) ||
-    ((val.t == ConvType::S16) && (((s16)val._s32) < 0));
-
-  flag_set(&cpu->flags, condition << SF);
+  if(flags & CF) _check_set_carry_flag(cpu, val);
+  if(flags & AF) _check_set_auxiliarry_carry_flag(cpu, val);
+  if(flags & SF) _check_set_sign_flag(cpu, val);
+  if(flags & ZF) _check_set_zero_flag(cpu, val);
+  if(flags & TF) {}; //TODO:
+  if(flags & IF) {}; //TODO:
+  if(flags & PF) _check_set_parity_flag(cpu, val);
+  if(flags & DF) {}; //TODO:
+  if(flags & OF) _check_set_overflow_flag(cpu, val);
 }
 
-static inline void _check_set_zero_flag(CPU* cpu, NumConv val)
-{
-  flag_clear(&cpu->flags, 1 << ZF);
-  flag_set(&cpu->flags, (!val._s32) << ZF);
-}
-
-static inline void _check_all_flags(CPU* cpu, NumConv val)
-{
-  _check_set_parity_flag(cpu, val);
-  _check_set_overflow_flag(cpu, val);
-  _check_set_sign_flag(cpu, val);
-  _check_set_zero_flag(cpu, val);
-}
 
 static inline void _store_sized_value(NumConv *cval, void* data)
 {
@@ -312,7 +332,7 @@ static s32 _exec_add(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
   *new_val = num_d._s16;
 
   _load_sized_value(&num_d, dst);
-  _check_all_flags(cpu, num_d);
+  _check_flags_list(cpu, num_d);
 
   return res;
 }
@@ -338,7 +358,7 @@ static s32 _exec_sub(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
   *new_val = num_d._s32;
 
   _load_sized_value(&num_d, dst);
-  _check_all_flags(cpu, num_d);
+  _check_flags_list(cpu, num_d);
 
   return res;
 }
@@ -363,7 +383,7 @@ static s32 _exec_cmp(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
   _store_sized_value(&num_d, dst);
 
   num_d._s32 -= num_s._s32;
-  _check_all_flags(cpu, num_d);
+  _check_flags_list(cpu, num_d);
 
   return res;
 }

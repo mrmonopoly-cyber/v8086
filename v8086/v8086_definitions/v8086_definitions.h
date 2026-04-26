@@ -7,8 +7,6 @@
 #include "types.h"
 #include "cpu.h"
 
-#define ArraySize(Array) (sizeof(Array)/sizeof(Array[0]))
-
 enum PowMem : u32{
   PowByte = 1,
   PowKilo = 10 * PowByte,
