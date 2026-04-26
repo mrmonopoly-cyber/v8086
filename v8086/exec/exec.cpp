@@ -7,10 +7,21 @@
 
 #include <v8086_definitions.h>
 
-typedef union
+enum ConvType
 {
-  s8 _s8;
-  s16 _s16;
+  S8=1,
+  S16,
+  S32,
+};
+
+typedef struct
+{
+  ConvType t;
+  union{
+    s8 _s8;
+    s16 _s16;
+    s32 _s32;
+  };
 }NumConv;
 
 typedef s32 (*op_exec)(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment],
@@ -19,13 +30,13 @@ typedef s32 (*op_exec)(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_S
 static u8 dummy_u8_buffer;
 static op_exec executor [(size_t)Opcode::__Opcode_count];
 
-static inline void _check_set_parity_flag(CPU* cpu, NumConv val, u8 byte_to_read)
+static inline void _check_set_parity_flag(CPU* cpu, NumConv val)
 {
   u8 num_1=0;
-  u8 cval = val._s8;
+  u8 cval = val._s32;
   flag_clear(&cpu->flags, 1 << PF);
 
-  for(u8 i=0; i<byte_to_read * 8; i++)
+  for(u8 i=0; i<val.t* 8; i++)
   {
     num_1 += ((cval >> i) & 0x1);
   }
@@ -36,6 +47,77 @@ static inline void _check_set_parity_flag(CPU* cpu, NumConv val, u8 byte_to_read
   }
 }
 
+static inline void _check_set_overflow_flag(CPU* cpu, NumConv val)
+{
+  const s16 max_s16 = 0x7FFF;
+  const s8 max_s8 = 0x7F;
+  const s16 min_s16 = (s16) 0x8000;
+  const s8 min_s8 = (s8) 0x80;
+  const u8 condition = 
+    ((val.t == ConvType::S8) && ((val._s32 < min_s8) || (val._s32 > max_s8))) ||
+    ((val.t == ConvType::S16) && ((val._s32 < min_s16) || (val._s32 > max_s16)));
+
+  flag_clear(&cpu->flags, 1 << OF);
+  flag_set(&cpu->flags, condition << OF);
+
+}
+
+static inline void _check_set_sign_flag(CPU* cpu, NumConv val)
+{
+  flag_clear(&cpu->flags, 1 << SF);
+  const u8 condition = 
+    ((val.t == ConvType::S8) && (((s8)val._s32) < 0)) ||
+    ((val.t == ConvType::S16) && (((s16)val._s32) < 0));
+
+  flag_set(&cpu->flags, condition << SF);
+}
+
+static inline void _check_set_zero_flag(CPU* cpu, NumConv val)
+{
+  flag_clear(&cpu->flags, 1 << ZF);
+  flag_set(&cpu->flags, (!val._s32) << ZF);
+}
+
+static inline void _check_all_flags(CPU* cpu, NumConv val)
+{
+  _check_set_parity_flag(cpu, val);
+  _check_set_overflow_flag(cpu, val);
+  _check_set_sign_flag(cpu, val);
+  _check_set_zero_flag(cpu, val);
+}
+
+static inline void _store_sized_value(NumConv *cval, void* data)
+{
+  switch (cval->t)
+  {
+    case S8:
+      cval->_s32 = *(s8*)data;
+      break;
+    case S16:
+      cval->_s32 = *(s16*)data;
+      break;
+    case S32:
+      cval->_s32 = *(s32*)data;
+      break;
+  }
+}
+
+static inline void _load_sized_value(NumConv *cval, void* data)
+{
+
+  switch (cval->t)
+  {
+    case S8:
+      *((u8*)data) = cval->_s32;
+      break;
+    case S16:
+      *((u16*)data) = cval->_s32;
+      break;
+    case S32:
+      *((u32*)data) = cval->_s32;
+      break;
+  }
+}
 
 static inline u8* _reg_to_ptr(Register reg, CPU* cpu, u8* o_reg_size = &dummy_u8_buffer)
 {
@@ -202,7 +284,6 @@ static s32 _exec_mov(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
   u8* src, *dst;
   u8 byte_to_move = 1;
 
-
   dst = _arg_to_ptr(&instr->args[0], cpu, segmens, &byte_to_move);
   src = _arg_to_ptr(&instr->args[1], cpu, segmens);
 
@@ -221,52 +302,22 @@ static s32 _exec_add(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
 {
   s32 res=0;
   u8* src, *dst;
-  u8 byte_to_move = 1;
-  NumConv num_s={0}, num_d={0}, old_v;
-  u8 sf;
-  u8 cf;
+  NumConv num_s={}, num_d={};
 
   cpu->ip += instr->size;
-  flag_clear(&cpu->flags, (1<<OF) | (1<<SF) | (1<<CF) | (1<<ZF));
 
-  dst = _arg_to_ptr(&instr->args[0], cpu, segmens, &byte_to_move);
-  src = _arg_to_ptr(&instr->args[1], cpu, segmens);
+  dst = _arg_to_ptr(&instr->args[0], cpu, segmens, (u8*) &num_d.t);
+  src = _arg_to_ptr(&instr->args[1], cpu, segmens, (u8*)&num_s.t);
 
-  assert(byte_to_move >=1 && byte_to_move <= 2);
+  _store_sized_value(&num_s, src);
+  _store_sized_value(&num_d, dst);
 
-  memcpy(&num_s._s16, src, byte_to_move);
-  memcpy(&num_d._s16, dst, byte_to_move);
+  *old_val = num_d._s16;
+  num_d._s32 += num_s._s32;
+  *new_val = num_d._s16;
 
-  old_v = num_d;
-
-  switch (byte_to_move)
-  {
-    case 0x1:
-      num_d._s8 += num_s._s8;
-      sf = num_d._s8 < 0;
-      cf = old_v._s8 >=0 && num_d._s8 < 0;
-      if(num_d._s8 >0 && num_s._s8 > 0 && old_v._s8 <0 && num_d._s8 < 0)
-      {
-        flag_set(&cpu->flags, 1 << OF);
-      }
-      break;
-    case 0x2:
-      num_d._s16 += num_s._s16;
-      sf = num_d._s16 < 0;
-      cf = old_v._s16 >=0 && num_d._s16 < 0;
-      if(num_d._s16 >0 && num_s._s16 > 0 && old_v._s16 <0 && num_d._s16 < 0)
-      {
-        flag_set(&cpu->flags, 1 << OF);
-      }
-      break;
-  }
-
-  memcpy(old_val, dst, byte_to_move);
-  memcpy(dst, &num_d, byte_to_move);
-  memcpy(new_val, dst, byte_to_move);
-  flag_set(&cpu->flags, (sf << SF) | (cf << CF) | (!(num_d._s16) << ZF));
-
-  _check_set_parity_flag(cpu, num_d, byte_to_move);
+  _load_sized_value(&num_d, dst);
+  _check_all_flags(cpu, num_d);
 
   return res;
 }
@@ -277,44 +328,22 @@ static s32 _exec_sub(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
 {
   s32 res=0;
   u8* src, *dst;
-  u8 byte_to_move = 1;
-  NumConv num_s={0}, num_d={0}, old_v;
-  u8 sf;
-  u8 cf;
+  NumConv num_s={}, num_d={};
 
   cpu->ip += instr->size;
-  flag_clear(&cpu->flags, (1<<OF) | (1<<SF) | (1<<CF) | (1<<ZF));
 
-  dst = _arg_to_ptr(&instr->args[0], cpu, segmens, &byte_to_move);
-  src = _arg_to_ptr(&instr->args[1], cpu, segmens);
+  dst = _arg_to_ptr(&instr->args[0], cpu, segmens, (u8*) &num_d.t);
+  src = _arg_to_ptr(&instr->args[1], cpu, segmens, (u8*) &num_s.t);
 
-  assert(byte_to_move >=1 && byte_to_move <= 2);
+  _store_sized_value(&num_s, src);
+  _store_sized_value(&num_d, dst);
 
-  memcpy(&num_s._s16, src, byte_to_move);
-  memcpy(&num_d._s16, dst, byte_to_move);
+  *old_val = num_d._s32;
+  num_d._s32 -= num_s._s32;
+  *new_val = num_d._s32;
 
-  old_v = num_d;
-
-  switch (byte_to_move)
-  {
-    case 0x1:
-      num_d._s8 -= num_s._s8;
-      sf = num_d._s8 < 0;
-      cf = old_v._s8 >=0 && num_d._s8 < 0;
-      break;
-    case 0x2:
-      num_d._s16 -= num_s._s16;
-      sf = num_d._s16 < 0;
-      cf = old_v._s16 >=0 && num_d._s16 < 0;
-      break;
-  }
-
-  memcpy(old_val, dst, byte_to_move);
-  memcpy(dst, &num_d, byte_to_move);
-  memcpy(new_val, dst, byte_to_move);
-  flag_set(&cpu->flags, (sf << SF) | (cf << CF) | (!(num_d._s16) << ZF));
-
-  _check_set_parity_flag(cpu, num_d, byte_to_move);
+  _load_sized_value(&num_d, dst);
+  _check_all_flags(cpu, num_d);
 
   return res;
 }
@@ -325,43 +354,21 @@ static s32 _exec_cmp(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
 {
   s32 res=0;
   u8* src, *dst;
-  u8 byte_to_move = 1;
-  NumConv num_s={0}, num_d={0}, old_v;
-  u8 sf;
-  u8 cf;
+  NumConv num_s={}, num_d={};
 
   UNUSED(old_val);
   UNUSED(new_val);
 
   cpu->ip += instr->size;
-  flag_clear(&cpu->flags, (1<<OF) | (1<<SF) | (1<<CF) | (1<<ZF));
 
-  dst = _arg_to_ptr(&instr->args[0], cpu, segmens, &byte_to_move);
-  src = _arg_to_ptr(&instr->args[1], cpu, segmens);
+  dst = _arg_to_ptr(&instr->args[0], cpu, segmens, (u8*) &num_d.t);
+  src = _arg_to_ptr(&instr->args[1], cpu, segmens, (u8*) &num_s.t);
 
-  assert(byte_to_move >=1 && byte_to_move <= 2);
+  _store_sized_value(&num_s, src);
+  _store_sized_value(&num_d, dst);
 
-  memcpy(&num_s._s16, src, byte_to_move);
-  memcpy(&num_d._s16, dst, byte_to_move);
-
-  old_v = num_d;
-
-  switch (byte_to_move)
-  {
-    case 0x1:
-      num_d._s8 -= num_s._s8;
-      sf = num_d._s8 < 0;
-      cf = old_v._s8 >=0 && num_d._s8 < 0;
-      break;
-    case 0x2:
-      num_d._s16 -= num_s._s16;
-      sf = num_d._s16 < 0;
-      cf = old_v._s16 >=0 && num_d._s16 < 0;
-      break;
-  }
-
-  flag_set(&cpu->flags, (sf << SF) | (cf << CF) | (!(num_d._s16) << ZF));
-  _check_set_parity_flag(cpu, num_d, byte_to_move);
+  num_d._s32 -= num_s._s32;
+  _check_all_flags(cpu, num_d);
 
   return res;
 }
