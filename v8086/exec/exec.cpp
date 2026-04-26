@@ -2,8 +2,8 @@
 #include "cpu.h"
 
 #include <assert.h>
-#include <cstdio>
 #include <string.h>
+#include <limits.h>
 
 #include <v8086_definitions.h>
 
@@ -49,13 +49,9 @@ static inline void _check_set_parity_flag(CPU* cpu, NumConv val)
 
 static inline void _check_set_overflow_flag(CPU* cpu, NumConv val)
 {
-  const s16 max_s16 = 0x7FFF;
-  const s8 max_s8 = 0x7F;
-  const s16 min_s16 = (s16) 0x8000;
-  const s8 min_s8 = (s8) 0x80;
   const u8 condition = 
-    ((val.t == ConvType::S8) && ((val._s32 < min_s8) || (val._s32 > max_s8))) ||
-    ((val.t == ConvType::S16) && ((val._s32 < min_s16) || (val._s32 > max_s16)));
+    ((val.t == ConvType::S8) && ((val._s32 < INT8_MIN) || (val._s32 > INT8_MAX))) ||
+    ((val.t == ConvType::S16) && ((val._s32 < INT16_MIN ) || (val._s32 > INT16_MAX)));
 
   flag_clear(&cpu->flags, 1u << OF);
   flag_set(&cpu->flags, condition << OF);
