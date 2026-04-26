@@ -56,7 +56,7 @@ enum RunMode
   Debug
 };
 
-int ProgramRun(v8086& self, ProgramID prog_id, RunMode mode = RunMode::Normal);
+int ProgramRun(v8086& self, ProgramID prog_id, FILE* out, RunMode mode = RunMode::Normal);
 
 static inline void v8086Shutdown(v8086& self)
 {

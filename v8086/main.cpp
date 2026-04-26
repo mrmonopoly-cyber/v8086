@@ -120,7 +120,7 @@ int main(int argc, char *argv[])
   fprintf(input.out, "\n\n");
   if(input.exec_options & ExecOptions::Run)
   {
-    if((res=ProgramRun(v8086, pid, RunMode::Debug))<0)
+    if((res=ProgramRun(v8086, pid, input.out, RunMode::Debug))<0)
     {
       fprintf(stderr, "error running the program: %d\n", res);
     }

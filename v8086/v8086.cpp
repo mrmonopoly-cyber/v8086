@@ -143,7 +143,7 @@ int ProgramDumpNextInstr(v8086& self,const ProgramID prog_id, Instruction* out)
   return res;
 }
 
-int ProgramRun(v8086& self, ProgramID prog_id, RunMode mode)
+int ProgramRun(v8086& self, ProgramID prog_id, FILE* out, RunMode mode)
 {
   int res=-1;
   Program* prog = &self.running[prog_id];
@@ -174,38 +174,38 @@ int ProgramRun(v8086& self, ProgramID prog_id, RunMode mode)
       res=0;
       if((err=InstructionExec(&instr, &self.cpu, segs, &old_val, &new_val))<0)
       {
-        fprintf(stderr, "execution error: %d with instr: ", err);
-        InstructionPrint(instr, stderr);
-        fprintf(stderr, "\n");
+        fprintf(out, "execution error: %d with instr: ", err);
+        InstructionPrint(instr, out);
+        fprintf(out, "\n");
         res = err;
         break;
       }
       else if(mode == RunMode::Debug)
       {
-        InstructionPrint(instr);
-        fprintf(stdout, "\t ; ");
+        InstructionPrint(instr, out);
+        fprintf(out, "\t ; ");
         if(old_val != new_val)
         {
-          print_arg(&instr.args[0], stdout, instr.seg);
-          fprintf(stdout, " = 0x%x -> 0x%x", old_val, new_val);
-          fprintf(stdout, "\t");
+          print_arg(&instr.args[0], out, instr.seg);
+          fprintf(out, " = 0x%x -> 0x%x", old_val, new_val);
+          fprintf(out, "\t");
         }
         if(old_flags != self.cpu.flags)
         {
-          fprintf(stdout, "FLAGS: ");
-          flag_print(old_flags, stdout);
-          fprintf(stdout, " -> ");
-          flag_print(self.cpu.flags, stdout);
+          fprintf(out, "FLAGS: ");
+          flag_print(old_flags, out);
+          fprintf(out, " -> ");
+          flag_print(self.cpu.flags, out);
         }
-        fprintf(stdout, "\n");
+        fprintf(out, "\n");
       }
       old_flags = self.cpu.flags;
     }
     else
     {
-      fprintf(stderr, "Mnemonic not recognized: ");
-      _print_byte(*mem_ptr, stderr);
-      fprintf(stderr, "\n");
+      fprintf(out, "Mnemonic not recognized: ");
+      _print_byte(*mem_ptr, out);
+      fprintf(out, "\n");
       res = -2;
       break;
     }
@@ -245,7 +245,7 @@ void V8086Dump(v8086& self, ProgramID prog_id, FILE* out)
           break;
       }
       fprintf(out, " segment\n");
-      SegmentPrint(&prog->segment[i].log_seg, &self.memory);
+      SegmentPrint(&prog->segment[i].log_seg, &self.memory, out);
     }
   }
 
