@@ -2,7 +2,6 @@
 #include "cpu.h"
 
 #include <assert.h>
-#include <cstdio>
 #include <string.h>
 #include <limits.h>
 
@@ -26,11 +25,7 @@ typedef struct
   };
 }NumConv;
 
-typedef s32 (*op_exec)(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment],
-    u16* old_val, u16* new_val);
-
 static u8 dummy_u8_buffer;
-static op_exec executor [(size_t)Opcode::__Opcode_count];
 
 static inline void _check_set_carry_flag(CPU* cpu, u32 arg1, u32 arg2)
 {
@@ -302,8 +297,6 @@ static s32 _exec_mov(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
   dst = _arg_to_ptr(&instr->args[0], cpu, segmens, &byte_to_move);
   src = _arg_to_ptr(&instr->args[1], cpu, segmens);
 
-  cpu->ip += instr->size;
-
   memcpy(old_val, dst, byte_to_move);
   memcpy(dst, src, byte_to_move);
   memcpy(new_val, dst, byte_to_move);
@@ -318,8 +311,6 @@ static s32 _exec_add(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
   s32 res=0;
   u8* src, *dst;
   NumConv num_s={}, num_d={};
-
-  cpu->ip += instr->size;
 
   dst = _arg_to_ptr(&instr->args[0], cpu, segmens, (u8*) &num_d.t);
   src = _arg_to_ptr(&instr->args[1], cpu, segmens, (u8*) &num_s.t);
@@ -346,7 +337,6 @@ static s32 _exec_sub(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
   s32 res=0;
   u8* src, *dst;
   NumConv num_s={}, num_d={};
-  cpu->ip += instr->size;
 
   dst = _arg_to_ptr(&instr->args[0], cpu, segmens, (u8*) &num_d.t);
   src = _arg_to_ptr(&instr->args[1], cpu, segmens, (u8*) &num_s.t);
@@ -377,8 +367,6 @@ static s32 _exec_cmp(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
   UNUSED(old_val);
   UNUSED(new_val);
 
-  cpu->ip += instr->size;
-
   dst = _arg_to_ptr(&instr->args[0], cpu, segmens, (u8*) &num_d.t);
   src = _arg_to_ptr(&instr->args[1], cpu, segmens, (u8*) &num_s.t);
 
@@ -394,30 +382,21 @@ static s32 _exec_cmp(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
   return res;
 }
 
-__attribute__((constructor))
-static void init_executor_array(void)
-{
-  for(size_t i=0; i<ArraySize(executor); i++)
-  {
-    executor[i] = invalid_op_exec;
-  }
-
-  executor[(size_t)Opcode::mov] = _exec_mov;
-  executor[(size_t)Opcode::sub] = _exec_sub;
-  executor[(size_t)Opcode::add] = _exec_add;
-  executor[(size_t)Opcode::cmp] = _exec_cmp;
-}
-
 s32 InstructionExec(Instruction* const instr, CPU* cpu, SegmentView segmens[__Num_Segment],
     u16* old_val, u16* new_val)
 {
-  s32 res=0;
-  op_exec exec = executor[(size_t)instr->op];
+  s32 res=-1;
 
   *old_val = 0;
   *new_val = 0;
 
-  res = exec(instr, cpu, segmens, old_val, new_val);
+  switch (instr->op)
+  {
+    case Opcode::mov: return _exec_mov(instr, cpu, segmens, old_val, new_val);
+    case Opcode::add: return _exec_add(instr, cpu, segmens, old_val, new_val);
+    case Opcode::sub: return _exec_sub(instr, cpu, segmens, old_val, new_val);
+    case Opcode::cmp: return _exec_cmp(instr, cpu, segmens, old_val, new_val);
+  }
 
   return res;
 }
