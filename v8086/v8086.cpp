@@ -167,7 +167,7 @@ int ProgramRun(v8086& self, ProgramID prog_id, FILE* out, RunMode mode)
     mem_ptr = PhyGetAddrAt(self.memory, physical_addr);
 
     err = InstructionDecode(mem_ptr, prog_length - self.cpu.ip, &instr);
-    
+    self.cpu.ip += instr.size;
 
     if(err)
     {
@@ -196,7 +196,10 @@ int ProgramRun(v8086& self, ProgramID prog_id, FILE* out, RunMode mode)
           flag_print(old_flags, out);
           fprintf(out, " -> ");
           flag_print(self.cpu.flags, out);
+          fprintf(out, "\t");
         }
+        fprintf(out, "ip: %d", self.cpu.ip);
+
         fprintf(out, "\n");
       }
       old_flags = self.cpu.flags;
