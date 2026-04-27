@@ -273,20 +273,6 @@ static inline u8* _arg_to_ptr(
   return res;
 }
 
-static s32 invalid_op_exec(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment],
-    u16* old_val, u16* new_val)
-{
-  s32 res=-1;
-
-  UNUSED(cpu);
-  UNUSED(instr);
-  UNUSED(segmens);
-  UNUSED(old_val);
-  UNUSED(new_val);
-
-  return res;
-}
-
 static s32 _exec_mov(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment],
     u16* old_val, u16* new_val)
 {
@@ -357,15 +343,11 @@ static s32 _exec_sub(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
 }
 
 //INFO: cmp updates AF, CF, OF, PF, FS, ZF
-static s32 _exec_cmp(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment],
-    u16* old_val, u16* new_val)
+static s32 _exec_cmp(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment])
 {
   s32 res=0;
   u8* src, *dst;
   NumConv num_s={}, num_d={};
-
-  UNUSED(old_val);
-  UNUSED(new_val);
 
   dst = _arg_to_ptr(&instr->args[0], cpu, segmens, (u8*) &num_d.t);
   src = _arg_to_ptr(&instr->args[1], cpu, segmens, (u8*) &num_s.t);
@@ -378,6 +360,97 @@ static s32 _exec_cmp(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
   _check_flags_list_no_cf_no_af(cpu, num_d);
   _check_set_carry_flag(cpu, num_d._s32 + num_s._s32, num_s._s32);
   _check_set_auxiliarry_carry_flag(cpu, num_d._s32 + num_s._s32, num_s._s32, num_d._s32);
+
+  return res;
+}
+
+static s32 _exec_conditional_jump(Instruction* instr, CPU* cpu, const u8 predicate)
+{
+  s32 res=0;
+  s16 inc=0;
+
+  switch (instr->args[0].t)
+  {
+    case ArgImm8:
+      inc = instr->args[0].imm8;
+      break;
+    case ArgImm16:
+      inc = instr->args[0].imm16;
+      break;
+    default:
+      assert(0 && "unreachable _exec_conditional_jump");
+      break;
+  }
+
+  cpu->ip += predicate * inc;
+
+  return res;
+}
+
+static s32 _exec_loopnz(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment],
+    u16* old_val, u16* new_val)
+{
+  s32 res=0;
+  s16 inc=0;
+  NumConv num;
+  u16* cx_reg = &cpu->regs[FullRegs::cx]._u16;
+
+  switch (instr->args[0].t)
+  {
+    case ArgImm8:
+      inc = instr->args[0].imm8;
+      break;
+    case ArgImm16:
+      inc = instr->args[0].imm16;
+      break;
+    default:
+      assert(0 && "unreachable _exec_conditional_jump");
+      break;
+  }
+
+  *old_val = *cx_reg;
+  (*cx_reg)--;
+  *new_val = *cx_reg;
+  
+  num.t = ConvType::S16;
+  num._u16 = *cx_reg;
+  _check_set_zero_flag(cpu, num);
+
+  cpu->ip += !flag_get(cpu->flags, ZF) * inc;
+
+  return res;
+}
+
+static s32 _exec_loopz(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Segment],
+    u16* old_val, u16* new_val)
+{
+  s32 res=0;
+  s16 inc=0;
+  NumConv num;
+  u16* cx_reg = &cpu->regs[FullRegs::cx]._u16;
+
+  switch (instr->args[0].t)
+  {
+    case ArgImm8:
+      inc = instr->args[0].imm8;
+      break;
+    case ArgImm16:
+      inc = instr->args[0].imm16;
+      break;
+    default:
+      assert(0 && "unreachable _exec_conditional_jump");
+      break;
+  }
+
+  *old_val = *cx_reg;
+  (*cx_reg)--;
+  *new_val = *cx_reg;
+  
+  num.t = ConvType::S16;
+  num._u16 = *cx_reg;
+  _check_set_zero_flag(cpu, num);
+
+  cpu->ip += flag_get(cpu->flags, ZF) * inc;
 
   return res;
 }
@@ -395,7 +468,15 @@ s32 InstructionExec(Instruction* const instr, CPU* cpu, SegmentView segmens[__Nu
     case Opcode::mov: return _exec_mov(instr, cpu, segmens, old_val, new_val);
     case Opcode::add: return _exec_add(instr, cpu, segmens, old_val, new_val);
     case Opcode::sub: return _exec_sub(instr, cpu, segmens, old_val, new_val);
-    case Opcode::cmp: return _exec_cmp(instr, cpu, segmens, old_val, new_val);
+    case Opcode::cmp: return _exec_cmp(instr, cpu, segmens);
+    case Opcode::jnz: return _exec_conditional_jump(instr, cpu, !flag_get(cpu->flags, ZF));
+    case Opcode::jz: return _exec_conditional_jump(instr, cpu, flag_get(cpu->flags, ZF));
+    case Opcode::jnb: return _exec_conditional_jump(instr, cpu, !flag_get(cpu->flags, CF));
+    case Opcode::jb: return _exec_conditional_jump(instr, cpu, flag_get(cpu->flags, CF));
+    case Opcode::jnp: return _exec_conditional_jump(instr, cpu, !flag_get(cpu->flags, PF));
+    case Opcode::jp: return _exec_conditional_jump(instr, cpu, flag_get(cpu->flags, PF));
+    case Opcode::loopnz: return _exec_loopnz(instr, cpu, segmens, old_val, new_val);
+    case Opcode::loopz: return _exec_loopz(instr, cpu, segmens, old_val, new_val);
   }
 
   return res;
