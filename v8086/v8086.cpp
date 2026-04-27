@@ -200,7 +200,7 @@ int ProgramRun(v8086& self, ProgramID prog_id, FILE* out, RunMode mode)
           flag_print(self.cpu.flags, out);
           fprintf(out, "\t");
         }
-        fprintf(out, "ip: %d -> %d", old_ip, self.cpu.ip);
+        fprintf(out, "ip: 0x%x -> 0x%x", old_ip, self.cpu.ip);
 
         fprintf(out, "\n");
       }

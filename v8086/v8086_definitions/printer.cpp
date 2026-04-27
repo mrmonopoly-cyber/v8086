@@ -255,6 +255,10 @@ void CPUPrint(CPU* cpu, FILE* out)
     fprintf(out, "\t(%d)\n", cpu->regs[r]._u16);
   }
 
-  fprintf(out, "FLAGS:\n");
+  fprintf(out, "IP: 0x%04x\t(%d)\n", cpu->ip, cpu->ip);
+
+  fprintf(out, "FLAGS:");
   flag_print_all(cpu->flags, out);
+  fprintf(out, "\n");
+
 }
