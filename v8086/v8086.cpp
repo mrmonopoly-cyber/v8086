@@ -155,6 +155,7 @@ int ProgramRun(v8086& self, ProgramID prog_id, FILE* out, RunMode mode)
   SegmentView segs[__Num_Segment];
   u16 old_val, new_val;
   FlagsReg old_flags = self.cpu.flags;
+  u16 old_ip = self.cpu.ip;
 
   for(size_t i=0; i<__Num_Segment; i++)
   {
@@ -166,6 +167,7 @@ int ProgramRun(v8086& self, ProgramID prog_id, FILE* out, RunMode mode)
     physical_addr = AddrFromSegment(prog->segment[CS].log_seg, self.cpu.ip);
     mem_ptr = PhyGetAddrAt(self.memory, physical_addr);
 
+    old_ip = self.cpu.ip;
     err = InstructionDecode(mem_ptr, prog_length - self.cpu.ip, &instr);
     self.cpu.ip += instr.size;
 
@@ -198,7 +200,7 @@ int ProgramRun(v8086& self, ProgramID prog_id, FILE* out, RunMode mode)
           flag_print(self.cpu.flags, out);
           fprintf(out, "\t");
         }
-        fprintf(out, "ip: %d", self.cpu.ip);
+        fprintf(out, "ip: %d -> %d", old_ip, self.cpu.ip);
 
         fprintf(out, "\n");
       }
