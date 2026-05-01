@@ -216,10 +216,27 @@ static inline u8* _reg_to_ptr(Register reg, CPU* cpu, u8* o_reg_size = &dummy_u8
 static inline u8* _arg_to_ptr(
     Arg* arg,
     CPU* cpu,
+    Segment working_seg,
     SegmentView segments[__Num_Segment],
     u8* o_reg_size = &dummy_u8_buffer)
 {
   u8* res = nullptr;
+  s16 disp=0;
+
+  switch (working_seg)
+  {
+    case SegNone:
+      working_seg = SS;
+      break;
+    case ES:
+    case CS:
+    case SS:
+    case DS:
+      break;
+    case __Num_Segment:
+      assert(0 && "unreachable _arg_to_ptr");
+      break;
+  }
 
   switch (arg->t)
   {
@@ -230,7 +247,8 @@ static inline u8* _arg_to_ptr(
       res = _reg_to_ptr(arg->reg, cpu, o_reg_size);
       break;
     case ArgMem:
-      TODO();
+      res = &segments[working_seg].data[arg->addr.addr];
+      *o_reg_size = 1 + arg->addr.word;
       break;
     case ArgUImm8:
       res = &arg->uimm8;
@@ -249,10 +267,33 @@ static inline u8* _arg_to_ptr(
       *o_reg_size = 2;
       break;
     case ArgMemRegDisp:
-      TODO();
+      disp = *(u16*)_reg_to_ptr(arg->reg_disp.r1, cpu, o_reg_size);
+      switch(arg->reg_disp.disp.t)
+      {
+        case Disp8:
+          disp += arg->reg_disp.disp.disp8;
+          break;
+        case Disp16:
+          disp += arg->reg_disp.disp.disp16;
+          break;
+      }
+      res = &segments[working_seg].data[disp];
+      *o_reg_size = 1 + arg->reg_disp.disp.word;
       break;
     case ArgMemRegRegDisp:
-      TODO();
+      disp += *(u16*)_reg_to_ptr(arg->reg_reg_disp.r1, cpu, o_reg_size);
+      disp += *(u16*)_reg_to_ptr(arg->reg_reg_disp.r2, cpu, o_reg_size);
+      switch(arg->reg_reg_disp.disp.t)
+      {
+        case Disp8:
+          disp += arg->reg_reg_disp.disp.disp8;
+          break;
+        case Disp16:
+          disp += arg->reg_reg_disp.disp.disp16;
+          break;
+      }
+      res = &segments[working_seg].data[disp];
+      *o_reg_size = 1 + arg->reg_reg_disp.disp.word;
       break;
     case ArgSegment:
       res = segments[arg->seg].data;
@@ -280,8 +321,8 @@ static s32 _exec_mov(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
   u8* src, *dst;
   u8 byte_to_move = 1;
 
-  dst = _arg_to_ptr(&instr->args[0], cpu, segmens, &byte_to_move);
-  src = _arg_to_ptr(&instr->args[1], cpu, segmens);
+  dst = _arg_to_ptr(&instr->args[0], cpu, instr->seg, segmens, &byte_to_move);
+  src = _arg_to_ptr(&instr->args[1], cpu, instr->seg, segmens);
 
   memcpy(old_val, dst, byte_to_move);
   memcpy(dst, src, byte_to_move);
@@ -298,8 +339,8 @@ static s32 _exec_add(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
   u8* src, *dst;
   NumConv num_s={}, num_d={};
 
-  dst = _arg_to_ptr(&instr->args[0], cpu, segmens, (u8*) &num_d.t);
-  src = _arg_to_ptr(&instr->args[1], cpu, segmens, (u8*) &num_s.t);
+  dst = _arg_to_ptr(&instr->args[0], cpu, instr->seg, segmens, (u8*) &num_d.t);
+  src = _arg_to_ptr(&instr->args[1], cpu, instr->seg, segmens, (u8*) &num_s.t);
 
   _store_sized_value(&num_s, src);
   _store_sized_value(&num_d, dst);
@@ -324,8 +365,8 @@ static s32 _exec_sub(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
   u8* src, *dst;
   NumConv num_s={}, num_d={};
 
-  dst = _arg_to_ptr(&instr->args[0], cpu, segmens, (u8*) &num_d.t);
-  src = _arg_to_ptr(&instr->args[1], cpu, segmens, (u8*) &num_s.t);
+  dst = _arg_to_ptr(&instr->args[0], cpu, instr->seg, segmens, (u8*) &num_d.t);
+  src = _arg_to_ptr(&instr->args[1], cpu, instr->seg, segmens, (u8*) &num_s.t);
 
   _store_sized_value(&num_s, src);
   _store_sized_value(&num_d, dst);
@@ -349,8 +390,8 @@ static s32 _exec_cmp(Instruction* instr, CPU* cpu, SegmentView segmens[__Num_Seg
   u8* src, *dst;
   NumConv num_s={}, num_d={};
 
-  dst = _arg_to_ptr(&instr->args[0], cpu, segmens, (u8*) &num_d.t);
-  src = _arg_to_ptr(&instr->args[1], cpu, segmens, (u8*) &num_s.t);
+  dst = _arg_to_ptr(&instr->args[0], cpu, instr->seg, segmens, (u8*) &num_d.t);
+  src = _arg_to_ptr(&instr->args[1], cpu, instr->seg, segmens, (u8*) &num_s.t);
 
   _store_sized_value(&num_s, src);
   _store_sized_value(&num_d, dst);
@@ -440,6 +481,8 @@ s32 InstructionExec(Instruction* const instr, CPU* cpu, SegmentView segmens[__Nu
     case Opcode::jp: return _exec_conditional_jump(instr, cpu, flag_get(cpu->flags, PF));
     case Opcode::loopnz: return _exec_loopnz_z(instr, cpu, false);
     case Opcode::loopz: return _exec_loopnz_z(instr, cpu, true);
+
+    case Opcode::__Opcode_count: assert(0 && __func__);
   }
 
   return res;
