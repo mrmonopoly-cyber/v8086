@@ -50,6 +50,8 @@ ProgramID ProgramLoad(v8086& self, const char* file_program_path, const ProgramO
 int ProgramDumpNextInstr(v8086& self,const ProgramID prog_id, Instruction* out);
 void V8086Dump(v8086& self, ProgramID prog_id =-1, FILE* out=stdout);
 
+size_t V8086DumpSegment(v8086& self, ProgramID prog_id, Segment segment, FILE* out=stdout);
+
 enum RunMode
 {
   Normal,

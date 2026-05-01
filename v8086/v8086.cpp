@@ -223,35 +223,59 @@ void V8086Dump(v8086& self, ProgramID prog_id, FILE* out)
 {
   if(out == nullptr) out = stdout;
   CPUPrint(&self.cpu, out);
-  Program* prog = &self.running[prog_id];
-  if(prog_id>=0)
+  if(prog_id >=0)
   {
-    for(size_t i=0; i<__Num_Segment; i++)
+    Program* prog = &self.running[prog_id];
+    if(prog_id>=0)
     {
-      switch ((Segment)i)
+      for(size_t i=0; i<__Num_Segment; i++)
       {
-        case ES:
-          fprintf(out, "ES");
-          break;
-        case CS:
-          fprintf(out, "CS");
-          break;
-        case SS:
-          fprintf(out, "SS");
-          break;
-        case DS:
-          fprintf(out, "DS");
-          break;
-        case SegNone:
-          assert(0 && "unreachable V8086Dump, SegNone");
-          break;
-        case __Num_Segment:
-          assert(0 && "unreachable V8086Dump, __Num_Segment");
-          break;
+        switch ((Segment)i)
+        {
+          case ES:
+            fprintf(out, "ES");
+            break;
+          case CS:
+            fprintf(out, "CS");
+            break;
+          case SS:
+            fprintf(out, "SS");
+            break;
+          case DS:
+            fprintf(out, "DS");
+            break;
+          case SegNone:
+            assert(0 && "unreachable V8086Dump, SegNone");
+            break;
+          case __Num_Segment:
+            assert(0 && "unreachable V8086Dump, __Num_Segment");
+            break;
+        }
+        fprintf(out, " segment\n");
+        SegmentPrint(&prog->segment[i].log_seg, &self.memory, out);
       }
-      fprintf(out, " segment\n");
-      SegmentPrint(&prog->segment[i].log_seg, &self.memory, out);
     }
   }
+}
 
+size_t V8086DumpSegment(v8086& self, ProgramID prog_id, Segment segment, FILE* out)
+{
+  size_t res=0;
+  Program* prog;
+  ProgramSegment* seg;
+  u32 physical_addr;
+  u8* mem_ptr;
+
+  if(out == nullptr) out = stdout;
+  if (prog_id >=0)
+  {
+    prog = &self.running[prog_id];
+    seg = &prog->segment[segment];
+
+    physical_addr = AddrFromSegment(prog->segment[CS].log_seg);
+    mem_ptr = PhyGetAddrAt(self.memory, physical_addr);
+    res = fwrite(mem_ptr, sizeof(*mem_ptr), seg->written, out);
+  }
+
+  return res;
 }
