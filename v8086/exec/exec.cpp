@@ -428,6 +428,37 @@ static s32 _exec_conditional_jump(Instruction* instr, CPU* cpu, const u8 predica
   return res;
 }
 
+static s32 _exec_loop(Instruction* instr, CPU* cpu)
+{
+  s32 res=0;
+  s16 inc=0;
+  NumConv num;
+  u16* cx_reg = &cpu->regs[FullRegs::cx]._u16;
+
+  switch (instr->args[0].t)
+  {
+    case ArgImm8:
+      inc = instr->args[0].imm8;
+      break;
+    case ArgImm16:
+      inc = instr->args[0].imm16;
+      break;
+    default:
+      assert(0 && "unreachable _exec_conditional_jump");
+      break;
+  }
+
+  (*cx_reg)--;
+  
+  num.t = ConvType::S16;
+  num._u16 = *cx_reg;
+  _check_set_zero_flag(cpu, num);
+
+  cpu->ip += (num._u16 != 0) * inc;
+
+  return res;
+}
+
 static s32 _exec_loopnz_z(Instruction* instr, CPU* cpu, u8 zf_nzf)
 {
   s32 res=0;
@@ -481,8 +512,11 @@ s32 InstructionExec(Instruction* const instr, CPU* cpu, SegmentView segmens[__Nu
     case Opcode::jp: return _exec_conditional_jump(instr, cpu, flag_get(cpu->flags, PF));
     case Opcode::loopnz: return _exec_loopnz_z(instr, cpu, false);
     case Opcode::loopz: return _exec_loopnz_z(instr, cpu, true);
+    case Opcode::loop: return _exec_loop(instr, cpu);
 
     case Opcode::__Opcode_count: assert(0 && __func__);
+
+    default: break;
   }
 
   return res;

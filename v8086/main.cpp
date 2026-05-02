@@ -6,6 +6,7 @@
 #include <string_view>
 
 #include "v8086.h"
+#include "v8086_definitions.h"
 
 enum ExecOptions : uint32_t
 {
@@ -13,10 +14,15 @@ enum ExecOptions : uint32_t
   Run = 1 << 1,
 };
 
+struct DumpSeg{
+  FILE* o_file = nullptr;
+};
+
 struct Inputs{
   FILE* out;
   const char* file_program_path;
   uint32_t exec_options;
+  DumpSeg dump_seg[Segment::__Num_Segment];
 };
 
 static inline void _help(void)
@@ -26,18 +32,52 @@ static inline void _help(void)
   printf("\t -o [file]\toutput file name. If not given stdout is used\n");
   printf("\t -d \t\tdisassemble the given program and save it on output file\n");
   printf("\t -r \t\trun the program\n");
+  printf("\t -dump [seg]\tdump a segment after running the program to stdout\n");
+  printf("\t -od [seg] [file]\tdump a segment after running the program to a file. Seg=SS,CS,DS,ES\n");
+}
+
+static inline char* _next_argv(int argc=0, char** argv=nullptr)
+{
+  static int num_elements = 0;
+  static int i=0;
+  static char** pool = nullptr;
+  char* res=nullptr;
+
+  if(argv){
+    pool = argv;
+  }
+
+  if(argc > 0)
+  {
+    num_elements = argc;
+    i=1;
+    return res;
+  }
+
+  if(pool && i < num_elements)
+  {
+    res = pool[i++];
+  }
+
+  return res;
 }
 
 static inline Inputs _parse_args(int argc, char **argv)
 {
   Inputs res;
   ::std::string_view sw;
+  ::std::string_view seg_str;
+  char* o_file_path;
+  Segment seg = Segment::SegNone;
+  char* arg;
+
+  _next_argv(argc, argv);
 
   res.out = stdout;
 
-  for(int i=1; i<argc; i++)
+  while((arg=_next_argv()) != nullptr)
   {
-    sw = argv[i];
+    sw = arg;
     if(!sw.compare("-h"))
     {
       _help();
@@ -45,16 +85,16 @@ static inline Inputs _parse_args(int argc, char **argv)
     }
     else if(!sw.compare("-o"))
     {
-      i++;
-      if(i>=argc)
+      sw = _next_argv();
+      if(sw.begin()==nullptr)
       {
         _help();
         exit(1);
       }
-      res.out = fopen(argv[i], "wa");
+      res.out = fopen(sw.begin(), "wa");
       if(res.out == nullptr)
       {
-        fprintf(stderr, "invalid out print: %s\n", strerror(errno));
+        fprintf(stderr, "invalid out file %s : %s\n", sw.begin(), strerror(errno));
         exit(2);
       }
     }
@@ -66,9 +106,51 @@ static inline Inputs _parse_args(int argc, char **argv)
     {
       res.exec_options |= ExecOptions::Run;
     }
+    else if(!sw.compare("-dump"))
+    {
+      if((seg_str = _next_argv()).begin() ==nullptr)
+      {
+        _help();
+        exit(1);
+      }
+      if(!seg_str.compare("ss") || !seg_str.compare("SS")) seg =Segment::SS;
+      else if(!seg_str.compare("ds") || !seg_str.compare("DS")) seg =Segment::DS;
+      else if(!seg_str.compare("es") || !seg_str.compare("ES")) seg =Segment::ES;
+      else if(!seg_str.compare("cs") || !seg_str.compare("CS")) seg =Segment::CS;
+      else
+      {
+        fprintf(stderr, "invalid seg %s. Acceptable: SS,ss,ds,DS,es,ES,cs,CS\n", seg_str.begin());
+        exit(2);
+      }
+      res.dump_seg[seg].o_file = stdout;
+    }
+    else if(!sw.compare("-od"))
+    {
+      if((seg_str = _next_argv()).begin() ==nullptr || (o_file_path = _next_argv()) == nullptr)
+      {
+        _help();
+        exit(1);
+      }
+      if(!seg_str.compare("ss") || !seg_str.compare("SS")) seg =Segment::SS;
+      else if(!seg_str.compare("ds") || !seg_str.compare("DS")) seg =Segment::DS;
+      else if(!seg_str.compare("es") || !seg_str.compare("ES")) seg =Segment::ES;
+      else if(!seg_str.compare("cs") || !seg_str.compare("CS")) seg =Segment::CS;
+      else
+      {
+        fprintf(stderr, "invalid seg %s. Acceptable: SS,ss,ds,DS,es,ES,cs,CS\n", seg_str.begin());
+        exit(2);
+      }
+      res.dump_seg[seg].o_file = fopen(o_file_path, "aw");
+      if(res.dump_seg[seg].o_file == nullptr)
+      {
+        fprintf(stderr, "invalid out file %s : %s\n", o_file_path, strerror(errno));
+        exit(2);
+      }
+    }
+
     else
     {
-      res.file_program_path = argv[i];
+      res.file_program_path = sw.begin();
     }
   }
 
@@ -125,10 +207,24 @@ int main(int argc, char *argv[])
       fprintf(stderr, "error running the program: %d\n", res);
     }
     V8086Dump(v8086, pid, input.out);
+    for(int i =0 ; i<Segment::__Num_Segment;i++)
+    {
+      if(input.dump_seg[i].o_file != nullptr)
+      {
+        V8086DumpSegment(v8086, pid, (Segment) i, input.dump_seg[i].o_file);
+      }
+    }
   }
 
 
 end:
   v8086Shutdown(v8086);
+  for(int i=0; i<Segment::__Num_Segment; i++)
+  {
+    if(input.dump_seg[i].o_file != nullptr && input.dump_seg[i].o_file != stdout)
+    {
+      fclose(input.dump_seg[i].o_file);
+    }
+  }
   return res;
 }

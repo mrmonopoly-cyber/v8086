@@ -262,7 +262,6 @@ size_t V8086DumpSegment(v8086& self, ProgramID prog_id, Segment segment, FILE* o
 {
   size_t res=0;
   Program* prog;
-  ProgramSegment* seg;
   u32 physical_addr;
   u8* mem_ptr;
 
@@ -270,11 +269,10 @@ size_t V8086DumpSegment(v8086& self, ProgramID prog_id, Segment segment, FILE* o
   if (prog_id >=0)
   {
     prog = &self.running[prog_id];
-    seg = &prog->segment[segment];
 
-    physical_addr = AddrFromSegment(prog->segment[CS].log_seg);
+    physical_addr = AddrFromSegment(prog->segment[segment].log_seg);
     mem_ptr = PhyGetAddrAt(self.memory, physical_addr);
-    res = fwrite(mem_ptr, sizeof(*mem_ptr), seg->written, out);
+    res = fwrite(mem_ptr, sizeof(*mem_ptr), 64 * (1 << PowKilo), out);
   }
 
   return res;
