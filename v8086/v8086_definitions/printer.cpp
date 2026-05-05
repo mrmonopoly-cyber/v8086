@@ -1,4 +1,6 @@
 #include "cpu.h"
+#include <cassert>
+#include <cstdio>
 #include <v8086_definitions.h>
 
 void print_arg(const Arg* const arg, FILE* out, const Segment seg)
@@ -261,4 +263,21 @@ void CPUPrint(CPU* cpu, FILE* out)
   flag_print_all(cpu->flags, out);
   fprintf(out, "\n");
 
+}
+
+void print_opcode(const Opcode op, FILE* out)
+{
+#define X(OP) case Opcode::OP: fprintf(out, #OP); break;
+  switch (op)
+  {
+    OPS
+    case Opcode::INVALID: fprintf(out, "invalid"); break;
+    case Opcode::OpAnd : fprintf(out, "and"); break;
+    case Opcode::OpNot : fprintf(out, "not"); break;
+    case Opcode::OpOr : fprintf(out, "or"); break;
+    case Opcode::OpXor : fprintf(out, "xor"); break;
+    case Opcode::OpInt : fprintf(out, "int"); break;
+    case Opcode::__Opcode_count: assert(0 && "unreachable");
+  }
+#undef X
 }

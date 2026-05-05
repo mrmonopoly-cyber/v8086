@@ -107,7 +107,7 @@ ProgramID ProgramLoad(v8086& self, const char* file_program_path, const ProgramO
   return res;
 }
 
-int ProgramDumpNextInstr(v8086& self,const ProgramID prog_id, Instruction* out)
+int ProgramDumpNextInstr(v8086& self,const ProgramID prog_id, Instruction* out, DecodeOpt opt)
 {
   assert(out);
   assert(prog_id >=0 && prog_id < MAX_NUM_OF_PROGRAMS );
@@ -130,6 +130,20 @@ int ProgramDumpNextInstr(v8086& self,const ProgramID prog_id, Instruction* out)
     {
       res=0;
       prog->decoding_index += out->size;
+      switch (opt)
+      {
+        case Cycles:
+          if(out->cycles == 0)
+          {
+            fprintf(stderr, "invalid cycles count %d for Instruction ", out->cycles);
+            InstructionPrint(*out, stderr);
+            fprintf(stderr, "\n");
+            res = -2;
+          }
+          break;
+        default:
+          break;
+      }
     }
     else
     {

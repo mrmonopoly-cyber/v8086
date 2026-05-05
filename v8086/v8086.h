@@ -15,6 +15,18 @@ struct ProgramOptInfo{
   u32 es_size = 64 * (1 << PowKilo);
 };
 
+enum RunMode
+{
+  Normal,
+  Debug
+};
+
+enum DecodeOpt
+{
+  DecodeBase,
+  Cycles=1,
+};
+
 struct ProgramSegment{
   LogicalSegment log_seg;
   u16 written;
@@ -47,16 +59,10 @@ static inline int v8086RegSize(v8086& self)
 
 ProgramID ProgramLoad(v8086& self, const char* file_program_path, const ProgramOptInfo& prog_info={});
   
-int ProgramDumpNextInstr(v8086& self,const ProgramID prog_id, Instruction* out);
+int ProgramDumpNextInstr(v8086& self,const ProgramID prog_id, Instruction* out, DecodeOpt opt=DecodeBase);
 void V8086Dump(v8086& self, ProgramID prog_id =-1, FILE* out=stdout);
 
 size_t V8086DumpSegment(v8086& self, ProgramID prog_id, Segment segment, FILE* out=stdout);
-
-enum RunMode
-{
-  Normal,
-  Debug
-};
 
 int ProgramRun(v8086& self, ProgramID prog_id, FILE* out, RunMode mode = RunMode::Normal);
 

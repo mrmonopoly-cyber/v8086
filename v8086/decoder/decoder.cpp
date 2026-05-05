@@ -407,6 +407,126 @@ bad:
   return res;
 }
 
+static u8 _cycles_ea(Arg* arg)
+{
+  u8 res=0;
+
+  switch (arg->t)
+  {
+    case ArgMem:
+      res = 6;
+      break;
+    case ArgMemRegDisp:
+      res = 5;
+      if(arg->reg_disp.disp.disp16)
+      {
+        res+=4;
+      }
+      break;
+    case ArgMemRegRegDisp:
+      if
+        (
+          (arg->reg_reg_disp.r1 == Register::dec_bp && arg->reg_reg_disp.r2 == Register::dec_di) ||
+          (arg->reg_reg_disp.r1 == Register::dec_bx && arg->reg_reg_disp.r2 == Register::dec_si)
+        )
+      {
+        res = 7;
+      }
+      else if
+        (
+          (arg->reg_reg_disp.r1 == Register::dec_bp && arg->reg_reg_disp.r2 == Register::dec_di) ||
+          (arg->reg_reg_disp.r1 == Register::dec_bx && arg->reg_reg_disp.r2 == Register::dec_si)
+        )
+      {
+        res = 8;
+      }
+      if(arg->reg_reg_disp.disp.disp16)
+      {
+        res+=4;
+      }
+      break;
+    default:
+      assert(0 && "unreachable");
+  }
+
+  return res;
+}
+
+#define ArgReg(t) ((t) == ArgType::ArgReg)
+
+#define ArgMem(t) \
+  ((t) == ArgType::ArgMem || \
+   (t) == ArgType::ArgMemRegDisp || \
+   (t) == ArgType::ArgMemRegRegDisp)
+
+#define ArgImm(t) \
+  ((t) == ArgType::ArgImm8 || \
+   (t) == ArgType::ArgImm16 || \
+   (t) == ArgType::ArgUImm8 || \
+   (t) == ArgType::ArgUImm16)
+
+static void _cycles_mov(Instruction* out)
+{
+  const ArgType t1 = out->args[0].t;
+  const ArgType t2 = out->args[1].t;
+
+  if(ArgReg(t1) && ArgReg(t2))
+  {
+    out->cycles = 2;
+  }
+  else if (ArgReg(t1) && ArgMem(t2))
+  {
+    out->cycles = 8 + _cycles_ea(&out->args[1]);
+  }
+  else if (ArgMem(t1) && ArgReg(t2))
+  {
+    out->cycles = 9 + _cycles_ea(&out->args[0]);
+  }
+  else if (ArgReg(t1) && ArgImm(t2))
+  {
+    out->cycles = 4;
+  }
+  else
+  {
+    fprintf(stderr, "unamanged case for cycles mov (%d, %d)\n", t1, t2); 
+    assert(0 && "unreachable");
+  }
+
+}
+
+static void _cycles_add(Instruction* out)
+{
+  const ArgType t1 = out->args[0].t;
+  const ArgType t2 = out->args[1].t;
+
+  if(ArgReg(t1) && ArgReg(t2))
+  {
+    out->cycles = 3;
+  }
+  else if (ArgReg(t1) && ArgMem(t2))
+  {
+    out->cycles = 9 + _cycles_ea(&out->args[1]);
+  }
+  else if (ArgMem(t1) && ArgReg(t2))
+  {
+    out->cycles = 16 + _cycles_ea(&out->args[0]);
+  }
+  else if (ArgMem(t1) && ArgImm(t2))
+  {
+    out->cycles = 17;
+  }
+  else if (ArgReg(t1) && ArgImm(t2))
+  {
+    out->cycles = 4;
+  }
+  else
+  {
+    fprintf(stderr, "unamanged case for cycles add (%d, %d)\n", t1, t2); 
+    assert(0 && "unreachable");
+  }
+
+}
+
 static u32 _decode_mov_mem_to_acc(
     const u8 first_byte, const u8* mem, u32 size, Instruction* out)
 {
@@ -1849,6 +1969,17 @@ u32 InstructionDecode(const u8* mem, const u32 mem_size, Instruction* out)
   out->op = Opcode::INVALID;
   res = decoder(opcode, mem + 1, mem_size -1, out);
   out->size = res;
+
+  switch (out->op)
+  {
+    case Opcode::mov: _cycles_mov(out); break;
+    case Opcode::add: _cycles_add(out); break;
+    default:
+      fprintf(stderr, "cycles for opcode ");
+      print_opcode(out->op, stderr);
+      fprintf(stderr, " not implemented\n");
+      break;
+  }
 
   return res;
 }

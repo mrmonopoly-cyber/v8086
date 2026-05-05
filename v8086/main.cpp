@@ -12,6 +12,8 @@ enum ExecOptions : uint32_t
 {
   Decode = 1 << 0,
   Run = 1 << 1,
+  CyclesEstimation = 1 << 2,
+  CyclesEstimationDetails = 1 << 3,
 };
 
 struct DumpSeg{
@@ -25,15 +27,22 @@ struct Inputs{
   DumpSeg dump_seg[Segment::__Num_Segment];
 };
 
+#define TAB_ALIGN_1 "\t"
+#define TAB_ALIGN_2 "\t\t"
+#define TAB_ALIGN_3 "\t\t\t"
+
 static inline void _help(void)
 {
-  printf("usage: v8086 <-h> [bin_file]\n");
-  printf("\t -h \t\tprint _help\n");
-  printf("\t -o [file]\toutput file name. If not given stdout is used\n");
-  printf("\t -d \t\tdisassemble the given program and save it on output file\n");
-  printf("\t -r \t\trun the program\n");
-  printf("\t -dump [seg]\tdump a segment after running the program to stdout\n");
-  printf("\t -od [seg] [file]\tdump a segment after running the program to a file. Seg=SS,CS,DS,ES\n");
+  printf("usage: v8086 [options] [bin_file]\n");
+  printf("options:\n");
+  printf("\t -h " TAB_ALIGN_3 "print _help\n");
+  printf("\t -o [file]" TAB_ALIGN_2 "output file name. If not given stdout is used\n");
+  printf("\t -d " TAB_ALIGN_3 "disassemble the given program and save it on output file\n");
+  printf("\t -cycles " TAB_ALIGN_2 "disassemble the given program and estimate the number of cycles for that program for each instruction\n");
+  printf("\t -cycles_v " TAB_ALIGN_2 "like -cycles but with extra details\n");
+  printf("\t -r " TAB_ALIGN_3 "run the program\n");
+  printf("\t -dump [seg] " TAB_ALIGN_2 "dump a segment after running the program to stdout\n");
+  printf("\t -od [seg] [file] " TAB_ALIGN_1 "dump a segment after running the program to a file. Seg=SS,CS,DS,ES\n");
 }
 
 static inline char* _next_argv(int argc=0, char** argv=nullptr)
@@ -75,15 +84,16 @@ static inline Inputs _parse_args(int argc, char **argv)
 
   res.out = stdout;
 
+#define IF_ARG(STR) if(!sw.compare(#STR))
   while((arg=_next_argv()) != nullptr)
   {
     sw = arg;
-    if(!sw.compare("-h"))
+    IF_ARG(-h)
     {
       _help();
       exit(0);
     }
-    else if(!sw.compare("-o"))
+    else IF_ARG(-o)
     {
       sw = _next_argv();
       if(sw.begin()==nullptr)
@@ -98,15 +108,23 @@ static inline Inputs _parse_args(int argc, char **argv)
         exit(2);
       }
     }
-    else if(!sw.compare("-d"))
+    else IF_ARG(-d)
     {
       res.exec_options |= ExecOptions::Decode;
     }
-    else if(!sw.compare("-r"))
+    else IF_ARG(-cycles)
+    {
+      res.exec_options |= ExecOptions::CyclesEstimation;
+    }
+    else IF_ARG(-cycles_v)
+    {
+      res.exec_options |= ExecOptions::CyclesEstimationDetails;
+    }
+    else IF_ARG(-r)
     {
       res.exec_options |= ExecOptions::Run;
     }
-    else if(!sw.compare("-dump"))
+    else IF_ARG(-dump)
     {
       if((seg_str = _next_argv()).begin() ==nullptr)
       {
@@ -124,7 +142,7 @@ static inline Inputs _parse_args(int argc, char **argv)
       }
       res.dump_seg[seg].o_file = stdout;
     }
-    else if(!sw.compare("-od"))
+    else IF_ARG(-od)
     {
       if((seg_str = _next_argv()).begin() ==nullptr || (o_file_path = _next_argv()) == nullptr)
       {
@@ -147,12 +165,12 @@ static inline Inputs _parse_args(int argc, char **argv)
         exit(2);
       }
     }
-
     else
     {
       res.file_program_path = sw.begin();
     }
   }
+#undef IF_ARG
 
   if(res.file_program_path == nullptr)
   {
@@ -189,7 +207,26 @@ int main(int argc, char *argv[])
     goto end;
   }
 
-  if(input.exec_options & ExecOptions::Decode)
+  if (input.exec_options & ExecOptions::CyclesEstimation || input.exec_options & ExecOptions::CyclesEstimationDetails)
+  {
+    u32 tot_cycles =0;
+    while(ProgramDumpNextInstr(v8086, pid, &instr, DecodeOpt::Cycles) >= 0)
+    {
+      InstructionPrint(instr, input.out);
+      if(input.exec_options & ExecOptions::CyclesEstimationDetails)
+      {
+        TODO("print cycles in details");
+      }
+      else
+      {
+        tot_cycles += instr.cycles;
+        fprintf(input.out, " ; cycles = %d", instr.cycles);
+      }
+      fprintf(input.out, "\n");
+    }
+    fprintf(input.out, "tot cycles = %d\n", tot_cycles);
+  
+  }else if(input.exec_options & ExecOptions::Decode)
   {
     fprintf(input.out, "bits %d\n\n", v8086RegSize(v8086));
     while(ProgramDumpNextInstr(v8086, pid, &instr) >= 0)
